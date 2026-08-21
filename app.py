@@ -8,11 +8,13 @@ import time
 # --- 1. CONEXIÓN A LA BASE DE DATOS ---
 db_url = "postgresql://postgres.gejkgyqrnmetjdguekvt:Alicomer2027%23@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
 
-# --- 2. MEMORIA DE SESIÓN (LOGIN Y FORMULARIO) ---
+# --- 2. MEMORIA DE SESIÓN ---
 if 'autenticado' not in st.session_state:
     st.session_state['autenticado'] = False
 if 'monitor_activo' not in st.session_state:
     st.session_state['monitor_activo'] = None
+if 'planta_activa' not in st.session_state:
+    st.session_state['planta_activa'] = None
 if 'id_actual' not in st.session_state:
     st.session_state['id_actual'] = str(uuid.uuid4())
 if 'llave_reinicio' not in st.session_state:
@@ -31,14 +33,13 @@ if menu == "⚙️ Mantenedor de Personal":
     st.info("⚠️ Acceso restringido a Jefatura de Calidad.")
     admin_pass = st.text_input("Ingrese contraseña de administrador:", type="password")
     
-    # CLAVE MAESTRA DEL MANTENEDOR (Puedes cambiarla aquí)
     if admin_pass == "Calidad2026": 
         st.success("Acceso concedido.")
         st.divider()
 
         # --- OPCIÓN A: CARGA MASIVA ---
         st.subheader("Opción 1: Carga Masiva (Excel)")
-        st.write("Sube la nómina oficial. **Debe contener 3 columnas exactas: Rol, Nombre, PIN**")
+        st.write("Sube la nómina oficial. **Debe contener 4 columnas exactas: Planta, Rol, Nombre, PIN**")
         archivo_subido = st.file_uploader("Cargar archivo Excel", type=["xlsx"])
 
         if archivo_subido is not None:
@@ -50,7 +51,7 @@ if menu == "⚙️ Mantenedor de Personal":
                     engine = create_engine(db_url)
                     df_personal.to_sql('maestro_personal', engine, if_exists='replace', index=False)
                     st.cache_data.clear()
-                    st.success("✅ ¡Base de datos reemplazada con éxito! Ahora incluye los PINs.")
+                    st.success("✅ ¡Base de datos reemplazada con éxito! Ahora es Multi-Planta.")
             except Exception as e:
                 st.error(f"Error al procesar el archivo: {e}")
 
@@ -58,7 +59,9 @@ if menu == "⚙️ Mantenedor de Personal":
 
         # --- OPCIÓN B: INGRESO MANUAL ---
         st.subheader("Opción 2: Ingreso Rápido Manual")
-        col_r, col_n, col_p = st.columns([1, 2, 1])
+        col_pl, col_r, col_n, col_p = st.columns([1.5, 1, 2, 1])
+        with col_pl:
+            nueva_planta = st.text_input("Planta (Ej: Alicomer)")
         with col_r:
             nuevo_rol = st.selectbox("Rol", ["Monitor", "Trabajador"])
         with col_n:
@@ -67,21 +70,22 @@ if menu == "⚙️ Mantenedor de Personal":
             nuevo_pin = st.text_input("PIN (Solo monitores)", max_chars=4, type="password")
 
         if st.button("Agregar Persona"):
-            if nuevo_nombre.strip() != "":
+            if nuevo_nombre.strip() != "" and nueva_planta.strip() != "":
                 nombre_limpio = nuevo_nombre.strip().title() 
+                planta_limpia = nueva_planta.strip().title()
                 pin_final = nuevo_pin if nuevo_rol == "Monitor" else None
                 
-                nuevo_registro_personal = pd.DataFrame([{'Rol': nuevo_rol, 'Nombre': nombre_limpio, 'PIN': pin_final}])
+                nuevo_registro_personal = pd.DataFrame([{'Planta': planta_limpia, 'Rol': nuevo_rol, 'Nombre': nombre_limpio, 'PIN': pin_final}])
 
                 try:
                     engine = create_engine(db_url)
                     nuevo_registro_personal.to_sql('maestro_personal', engine, if_exists='append', index=False)
                     st.cache_data.clear()
-                    st.success(f"✅ {nombre_limpio} agregado exitosamente.")
+                    st.success(f"✅ {nombre_limpio} agregado exitosamente a {planta_limpia}.")
                 except Exception as e:
-                    st.error(f"❌ Error al agregar. ¿Ya subiste el Excel con la columna PIN? Detalle: {e}")
+                    st.error(f"❌ Error al agregar. Detalle: {e}")
             else:
-                st.warning("Debe ingresar un nombre válido.")
+                st.warning("Debe ingresar una Planta y un Nombre válido.")
 
 # ==========================================
 # PANTALLA 2: INGRESO DE INSPECCIÓN (LOGIN DE MONITORES)
@@ -104,8 +108,8 @@ elif menu == "📝 Ingreso de Inspección":
         st.title("🔒 Acceso de Monitores")
         st.write("Ingrese sus credenciales para iniciar una inspección.")
         
-        if df_personal.empty or 'PIN' not in df_personal.columns:
-            st.warning("⚠️ El sistema no está configurado aún. Vaya al Mantenedor y suba el Excel con las columnas: Rol, Nombre, PIN.")
+        if df_personal.empty or 'PIN' not in df_personal.columns or 'Planta' not in df_personal.columns:
+            st.warning("⚠️ El sistema no está configurado aún. Vaya al Mantenedor y suba el Excel con las columnas: Planta, Rol, Nombre, PIN.")
         else:
             monitores_db = df_personal[df_personal['Rol'] == 'Monitor']
             lista_monitores = monitores_db['Nombre'].str.strip().drop_duplicates().sort_values().tolist()
@@ -117,9 +121,10 @@ elif menu == "📝 Ingreso de Inspección":
                 if usuario_intento is None:
                     st.error("Seleccione un usuario.")
                 else:
-                    pin_real = monitores_db[monitores_db['Nombre'] == usuario_intento]['PIN'].values[0]
+                    fila_monitor = monitores_db[monitores_db['Nombre'] == usuario_intento].iloc[0]
+                    pin_real = fila_monitor['PIN']
+                    planta_real = fila_monitor['Planta']
                     
-                    # Limpiamos el ".0" fantasma que agrega Pandas desde el Excel
                     pin_real_str = str(pin_real).strip()
                     if pin_real_str.endswith('.0'):
                         pin_real_str = pin_real_str[:-2]
@@ -127,18 +132,24 @@ elif menu == "📝 Ingreso de Inspección":
                     if str(pin_intento).strip() == pin_real_str:
                         st.session_state['autenticado'] = True
                         st.session_state['monitor_activo'] = usuario_intento
+                        st.session_state['planta_activa'] = planta_real
                         st.rerun()
                     else:
                         st.error("❌ PIN incorrecto.")
-    # --- FORMULARIO DE INSPECCIÓN (SI ESTÁ AUTENTICADO) ---
+
+    # --- FORMULARIO DE INSPECCIÓN ---
     else:
-        lista_trabajadores = df_personal[df_personal['Rol'] == 'Trabajador']['Nombre'].str.strip().drop_duplicates().sort_values().tolist()
+        # MAGIA: Filtramos la lista de trabajadores para mostrar solo los de la misma planta del monitor
+        trabajadores_planta = df_personal[(df_personal['Rol'] == 'Trabajador') & (df_personal['Planta'] == st.session_state['planta_activa'])]
+        lista_trabajadores = trabajadores_planta['Nombre'].str.strip().drop_duplicates().sort_values().tolist()
 
         st.sidebar.divider()
+        st.sidebar.success(f"🏢 Planta: {st.session_state['planta_activa']}")
         st.sidebar.success(f"👤 Conectado: {st.session_state['monitor_activo']}")
         if st.sidebar.button("Cerrar Sesión"):
             st.session_state['autenticado'] = False
             st.session_state['monitor_activo'] = None
+            st.session_state['planta_activa'] = None
             st.rerun()
 
         st.title("Checklist de Higiene R.P-15.02")
@@ -150,11 +161,12 @@ elif menu == "📝 Ingreso de Inspección":
         with col2:
             hora = st.time_input("Hora", datetime.datetime.now().time(), disabled=True)
 
-        col3, col4 = st.columns(2)
-        with col3:
-            # MAGIA AUTOMÁTICA: El monitor se llena solo gracias al login
+        col_p, col_m, col_t = st.columns([1, 1.5, 1.5])
+        with col_p:
+            planta_ui = st.text_input("Planta*", st.session_state['planta_activa'], disabled=True)
+        with col_m:
             monitor = st.text_input("Monitor*", st.session_state['monitor_activo'], disabled=True)
-        with col4:
+        with col_t:
             trabajador = st.selectbox("Trabajador Evaluado*", lista_trabajadores, index=None, placeholder="--- Seleccione Trabajador ---", key=f"sel_t_{st.session_state['llave_reinicio']}")        
         
         st.write("Turno*")
@@ -221,8 +233,10 @@ elif menu == "📝 Ingreso de Inspección":
                 fecha_hora_str = f"{fecha} {hora}" 
                 nuevo_id = st.session_state['id_actual'] 
 
+                # Inyectamos la planta en la cabecera
                 nuevo_registro_cabecera = pd.DataFrame([{
                     'id_registro': nuevo_id,
+                    'planta': st.session_state['planta_activa'],
                     'fecha_hora': fecha_hora_str, 
                     'monitor': monitor,
                     'trabajador_evaluado': trabajador, 
@@ -248,8 +262,9 @@ elif menu == "📝 Ingreso de Inspección":
                 try:
                     with st.spinner("Guardando registro en la nube..."):
                         engine = create_engine(db_url)
-                        nuevo_registro_cabecera.to_sql('inspecciones_cabecera', engine, if_exists='append', index=False)
-                        df_detalles.to_sql('inspecciones_detalle', engine, if_exists='append', index=False)
+                        # Creamos la versión V2 de las tablas para alojar la nueva columna sin errores
+                        nuevo_registro_cabecera.to_sql('inspecciones_cabecera_v2', engine, if_exists='append', index=False)
+                        df_detalles.to_sql('inspecciones_detalle_v2', engine, if_exists='append', index=False)
 
                     st.success(f"✅ ¡Registro guardado exitosamente! | Turno: {turno_final}")
                     
