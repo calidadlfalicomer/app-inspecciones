@@ -331,14 +331,14 @@ elif menu == "📝 Ingreso de Inspección":
                     else:
                         st.error(f"❌ Error al guardar en la base de datos: {e}")
 
-import plotly.express as px
+    import plotly.express as px
 
-# ... (Todo tu código anterior del Mantenedor y el Ingreso de Inspecciones) ...
+    # ... (Todo tu código anterior del Mantenedor y el Ingreso de Inspecciones) ...
 
-# ==========================================
-# PANTALLA 3: PANEL DE MÉTRICAS (DATA STUDIO)
-# ==========================================
-elif menu == "📊 Panel de Métricas":
+    # ==========================================
+    # PANTALLA 3: PANEL DE MÉTRICAS (DATA STUDIO)
+    # ==========================================
+    elif menu == "📊 Panel de Métricas":
     st.title("📊 Panel de Métricas de Higiene")
     
     # Función para cargar toda la data unida (Cabecera + Detalle)
