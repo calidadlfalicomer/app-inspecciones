@@ -58,33 +58,41 @@ if menu == "⚙️ Mantenedor de Personal":
         st.divider()
 
         st.subheader("Opción 2: Ingreso Rápido Manual")
-        col_pl, col_r, col_n, col_p = st.columns([1.5, 1, 2, 1])
+        
+        # ESTRUCTURA DIVIDIDA PARA EL NOMBRE
+        col_pl, col_r = st.columns(2)
         with col_pl:
             nueva_planta = st.text_input("Planta (Ej: Alicomer o AMBAS)")
         with col_r:
             nuevo_rol = st.selectbox("Rol", ["Monitor", "Trabajador"])
-        with col_n:
-            nuevo_nombre = st.text_input("Nombre Completo")
+            
+        col_n1, col_n2, col_p = st.columns([1.5, 1.5, 1])
+        with col_n1:
+            nuevo_nombre = st.text_input("Nombre(s)")
+        with col_n2:
+            nuevo_apellido = st.text_input("Apellido(s)")
         with col_p:
             nuevo_pin = st.text_input("PIN (Solo monitores)", max_chars=4, type="password")
 
         if st.button("Agregar Persona"):
-            if nuevo_nombre.strip() != "" and nueva_planta.strip() != "":
-                nombre_limpio = nuevo_nombre.strip().title() 
+            if nuevo_nombre.strip() != "" and nuevo_apellido.strip() != "" and nueva_planta.strip() != "":
+                
+                # UNIÓN Y FORMATO AUTOMÁTICO (Ej: Juan Perez)
+                nombre_completo = f"{nuevo_nombre.strip()} {nuevo_apellido.strip()}".title()
                 planta_limpia = nueva_planta.strip().upper() if nueva_planta.strip().upper() == "AMBAS" else nueva_planta.strip().title()
                 pin_final = nuevo_pin if nuevo_rol == "Monitor" else None
                 
-                nuevo_registro_personal = pd.DataFrame([{'Planta': planta_limpia, 'Rol': nuevo_rol, 'Nombre': nombre_limpio, 'PIN': pin_final}])
+                nuevo_registro_personal = pd.DataFrame([{'Planta': planta_limpia, 'Rol': nuevo_rol, 'Nombre': nombre_completo, 'PIN': pin_final}])
 
                 try:
                     engine = create_engine(db_url)
                     nuevo_registro_personal.to_sql('maestro_personal', engine, if_exists='append', index=False)
                     st.cache_data.clear()
-                    st.success(f"✅ {nombre_limpio} agregado exitosamente a {planta_limpia}.")
+                    st.success(f"✅ {nombre_completo} agregado exitosamente a {planta_limpia}.")
                 except Exception as e:
                     st.error(f"❌ Error al agregar. Detalle: {e}")
             else:
-                st.warning("Debe ingresar una Planta y un Nombre válido.")
+                st.warning("⚠️ Debe ingresar Planta, Nombre y Apellido obligatoriamente.")
 
 # ==========================================
 # PANTALLA 2: INGRESO DE INSPECCIÓN (LOGIN DE MONITORES)
@@ -177,33 +185,40 @@ elif menu == "📝 Ingreso de Inspección":
         with col_t:
             trabajador = st.selectbox("Trabajador Evaluado*", lista_trabajadores, index=None, placeholder="--- Seleccione Trabajador ---", key=f"sel_t_{st.session_state['llave_reinicio']}")        
         
-        # --- NUEVO: MINI-MANTENEDOR DELEGADO ---
+        # --- MINI-MANTENEDOR DIVIDIDO EN NOMBRE Y APELLIDO ---
         if planta_final:
             with st.expander("➕ ¿Falta personal? Agregar nuevo trabajador a la lista"):
-                nuevo_nombre_rapido = st.text_input("Nombre del Trabajador (Nomnbre + Apellido):")
+                col_n1, col_n2 = st.columns(2)
+                with col_n1:
+                    nuevo_nombre_rapido = st.text_input("Nombre:")
+                with col_n2:
+                    nuevo_apellido_rapido = st.text_input("Apellido:")
+                
                 if st.button("Guardar y Actualizar Lista", type="secondary"):
-                    if nuevo_nombre_rapido.strip() != "":
-                        nombre_limpio_rapido = nuevo_nombre_rapido.strip().title()
+                    if nuevo_nombre_rapido.strip() != "" and nuevo_apellido_rapido.strip() != "":
+                        
+                        # UNE Y FORMATEA (Pone las mayúsculas correctas automáticamente)
+                        nombre_completo_rapido = f"{nuevo_nombre_rapido.strip()} {nuevo_apellido_rapido.strip()}".title()
                         
                         nuevo_registro = pd.DataFrame([{
                             'Planta': str(planta_final).title(), 
                             'Rol': 'Trabajador', 
-                            'Nombre': nombre_limpio_rapido, 
+                            'Nombre': nombre_completo_rapido, 
                             'PIN': None
                         }])
                         
                         try:
                             engine = create_engine(db_url)
                             nuevo_registro.to_sql('maestro_personal', engine, if_exists='append', index=False)
-                            st.cache_data.clear() # Limpia la memoria para que aparezca al instante
-                            st.success(f"✅ {nombre_limpio_rapido} agregado. Actualizando...")
+                            st.cache_data.clear() 
+                            st.success(f"✅ {nombre_completo_rapido} agregado. Actualizando...")
                             time.sleep(1)
-                            st.rerun() # Fuerza la recarga de la página
+                            st.rerun() 
                         except Exception as e:
                             st.error(f"❌ Error al agregar: {e}")
                     else:
-                        st.warning("Debe ingresar el nombre del trabajador.")
-        # ----------------------------------------
+                        st.warning("⚠️ Debe ingresar el Nombre y el Apellido en ambas casillas para poder guardar.")
+        # -----------------------------------------------------
 
         st.write("Turno*")
         col_t1, col_t2 = st.columns(2)
