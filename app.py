@@ -180,7 +180,7 @@ elif menu == "📝 Ingreso de Inspección":
         # --- NUEVO: MINI-MANTENEDOR DELEGADO ---
         if planta_final:
             with st.expander("➕ ¿Falta personal? Agregar nuevo trabajador a la lista"):
-                nuevo_nombre_rapido = st.text_input("Nombre del Trabajador (Nomnre + Apellido):")
+                nuevo_nombre_rapido = st.text_input("Nombre del Trabajador (Nomnbre + Apellido):")
                 if st.button("Guardar y Actualizar Lista", type="secondary"):
                     if nuevo_nombre_rapido.strip() != "":
                         nombre_limpio_rapido = nuevo_nombre_rapido.strip().title()
