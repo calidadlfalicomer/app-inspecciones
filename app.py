@@ -37,7 +37,6 @@ if menu == "⚙️ Mantenedor de Personal":
         st.success("Acceso concedido.")
         st.divider()
 
-        # --- OPCIÓN A: CARGA MASIVA ---
         st.subheader("Opción 1: Carga Masiva (Excel)")
         st.write("Sube la nómina oficial. **Debe contener 4 columnas exactas: Planta, Rol, Nombre, PIN**")
         st.write("*(Tip: Si un monitor revisa más de una instalación, ponle la palabra **AMBAS** en su Planta)*")
@@ -58,7 +57,6 @@ if menu == "⚙️ Mantenedor de Personal":
 
         st.divider()
 
-        # --- OPCIÓN B: INGRESO MANUAL ---
         st.subheader("Opción 2: Ingreso Rápido Manual")
         col_pl, col_r, col_n, col_p = st.columns([1.5, 1, 2, 1])
         with col_pl:
@@ -104,7 +102,6 @@ elif menu == "📝 Ingreso de Inspección":
 
     df_personal = cargar_nombres_oficiales()
 
-    # --- PANTALLA DE LOGIN ---
     if not st.session_state['autenticado']:
         st.title("🔒 Acceso de Monitores")
         st.write("Ingrese sus credenciales para iniciar una inspección.")
@@ -138,7 +135,6 @@ elif menu == "📝 Ingreso de Inspección":
                     else:
                         st.error("❌ PIN incorrecto.")
 
-    # --- FORMULARIO DE INSPECCIÓN ---
     else:
         st.sidebar.divider()
         st.sidebar.success(f"👤 Conectado: {st.session_state['monitor_activo']}")
@@ -159,19 +155,16 @@ elif menu == "📝 Ingreso de Inspección":
 
         col_p, col_m, col_t = st.columns([1, 1.5, 1.5])
         
-        # LOGICA DEL COMODÍN "AMBAS"
         es_multiplanta = st.session_state['planta_activa'].upper() == "AMBAS"
         
         with col_p:
             if es_multiplanta:
-                # Extrae dinámicamente los nombres de las plantas reales (excluyendo la palabra AMBAS)
                 plantas_reales = df_personal[df_personal['Planta'].str.upper() != 'AMBAS']['Planta'].dropna().unique().tolist()
                 planta_final = st.selectbox("Planta*", plantas_reales, index=None, placeholder="-- Elija --", key=f"sel_p_{st.session_state['llave_reinicio']}")
             else:
                 planta_final = st.session_state['planta_activa']
                 st.text_input("Planta*", planta_final, disabled=True)
 
-        # Filtrado de trabajadores condicionado a la planta_final
         if planta_final:
             trabajadores_planta = df_personal[(df_personal['Rol'] == 'Trabajador') & (df_personal['Planta'].str.upper() == str(planta_final).upper())]
             lista_trabajadores = trabajadores_planta['Nombre'].str.strip().drop_duplicates().sort_values().tolist()
@@ -184,6 +177,34 @@ elif menu == "📝 Ingreso de Inspección":
         with col_t:
             trabajador = st.selectbox("Trabajador Evaluado*", lista_trabajadores, index=None, placeholder="--- Seleccione Trabajador ---", key=f"sel_t_{st.session_state['llave_reinicio']}")        
         
+        # --- NUEVO: MINI-MANTENEDOR DELEGADO ---
+        if planta_final:
+            with st.expander("➕ ¿Falta personal? Agregar nuevo trabajador a la lista"):
+                nuevo_nombre_rapido = st.text_input("Nombre Completo del Trabajador:")
+                if st.button("Guardar y Actualizar Lista", type="secondary"):
+                    if nuevo_nombre_rapido.strip() != "":
+                        nombre_limpio_rapido = nuevo_nombre_rapido.strip().title()
+                        
+                        nuevo_registro = pd.DataFrame([{
+                            'Planta': str(planta_final).title(), 
+                            'Rol': 'Trabajador', 
+                            'Nombre': nombre_limpio_rapido, 
+                            'PIN': None
+                        }])
+                        
+                        try:
+                            engine = create_engine(db_url)
+                            nuevo_registro.to_sql('maestro_personal', engine, if_exists='append', index=False)
+                            st.cache_data.clear() # Limpia la memoria para que aparezca al instante
+                            st.success(f"✅ {nombre_limpio_rapido} agregado. Actualizando...")
+                            time.sleep(1)
+                            st.rerun() # Fuerza la recarga de la página
+                        except Exception as e:
+                            st.error(f"❌ Error al agregar: {e}")
+                    else:
+                        st.warning("Debe ingresar el nombre del trabajador.")
+        # ----------------------------------------
+
         st.write("Turno*")
         col_t1, col_t2 = st.columns(2)
         with col_t1:
@@ -250,7 +271,6 @@ elif menu == "📝 Ingreso de Inspección":
                 fecha_hora_str = f"{fecha} {hora}" 
                 nuevo_id = st.session_state['id_actual'] 
 
-                # Inyectamos la planta_final (ya sea seleccionada o bloqueada) en la cabecera
                 nuevo_registro_cabecera = pd.DataFrame([{
                     'id_registro': nuevo_id,
                     'planta': planta_final,
