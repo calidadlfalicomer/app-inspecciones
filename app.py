@@ -4,6 +4,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 import uuid
 import time
+import plotly.express as px
 
 # --- 1. CONEXIÓN A LA BASE DE DATOS ---
 db_url = "postgresql://postgres.gejkgyqrnmetjdguekvt:Alicomer2027%23@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
@@ -22,7 +23,7 @@ if 'llave_reinicio' not in st.session_state:
 
 # --- 3. MENÚ LATERAL ---
 st.sidebar.title("Sistema de Gestión")
-menu = st.sidebar.radio("Navegación:", ["📝 Ingreso de Inspección", "⚙️ Mantenedor de Personal"], key="menu_principal")
+menu = st.sidebar.radio("Navegación:", ["📝 Ingreso de Inspección", "⚙️ Mantenedor de Personal", "📊 Panel de Métricas"], key="menu_principal")
 
 # ==========================================
 # PANTALLA 1: MANTENEDOR DE PERSONAL (MODO ADMIN)
@@ -330,3 +331,104 @@ elif menu == "📝 Ingreso de Inspección":
                         st.warning("⚠️ El registro ya fue guardado correctamente. Evite hacer doble clic.")
                     else:
                         st.error(f"❌ Error al guardar en la base de datos: {e}")
+
+# ==========================================
+# PANTALLA 3: PANEL DE MÉTRICAS (DATA STUDIO)
+# ==========================================
+elif menu == "📊 Panel de Métricas":
+    st.title("📊 Panel de Métricas de Higiene")
+    
+    @st.cache_data(ttl=60)
+    def cargar_datos_completos():
+        try:
+            engine = create_engine(db_url)
+            query = """
+                SELECT 
+                    c.planta, c.fecha_hora, c.monitor, c.trabajador_evaluado, 
+                    c.turno_final, c.area, d.parametro, d.evaluacion, d.accion_correctiva 
+                FROM inspecciones_cabecera_v2 c
+                JOIN inspecciones_detalle_v2 d ON c.id_registro = d.id_registro
+            """
+            df = pd.read_sql(query, engine)
+            df['fecha_hora'] = pd.to_datetime(df['fecha_hora'])
+            return df
+        except Exception as e:
+            st.error(f"Error al cargar datos: {e}")
+            return pd.DataFrame()
+
+    df_total = cargar_datos_completos()
+
+    if df_total.empty:
+        st.info("Aún no hay registros en la nueva base de datos Multi-Planta para mostrar.")
+    else:
+        st.subheader("Filtros de Análisis")
+        col_f1, col_f2 = st.columns(2)
+        
+        with col_f1:
+            lista_plantas = ["Todas las Plantas"] + list(df_total['planta'].dropna().unique())
+            planta_filtro = st.selectbox("🏢 Seleccionar Planta", lista_plantas)
+        
+        with col_f2:
+            meses_disponibles = df_total['fecha_hora'].dt.to_period('M').unique()
+            mes_filtro = st.selectbox("📅 Mes de Análisis", ["Todos"] + list(meses_disponibles))
+
+        df_filtrado = df_total.copy()
+        if planta_filtro != "Todas las Plantas":
+            df_filtrado = df_filtrado[df_filtrado['planta'] == planta_filtro]
+        if mes_filtro != "Todos":
+            df_filtrado = df_filtrado[df_filtrado['fecha_hora'].dt.to_period('M') == mes_filtro]
+
+        st.divider()
+
+        df_nc = df_filtrado[df_filtrado['evaluacion'] == 'NO CUMPLE']
+
+        if df_nc.empty:
+            st.success("🎉 ¡Excelente! No hay registros de 'NO CUMPLE' en este periodo para la selección.")
+        else:
+            st.subheader(f"Análisis de Desviaciones Absolutas (Total: {len(df_nc)} No Cumple)")
+            
+            col_graf1, col_graf2 = st.columns(2)
+
+            with col_graf1:
+                df_param = df_nc['parametro'].value_counts().reset_index().head(5)
+                df_param.columns = ['Parámetro', 'Cantidad NC']
+                df_param = df_param.sort_values('Cantidad NC', ascending=True) 
+                
+                fig_param = px.bar(df_param, x='Cantidad NC', y='Parámetro', orientation='h', 
+                                   title='Top 5 Dimensiones Críticas', text_auto=True,
+                                   color_discrete_sequence=['#ef553b'])
+                fig_param.update_layout(yaxis_title=None, xaxis_title="N° de Desviaciones")
+                st.plotly_chart(fig_param, use_container_width=True)
+
+            with col_graf2:
+                df_trab = df_nc['trabajador_evaluado'].value_counts().reset_index().head(5)
+                df_trab.columns = ['Trabajador', 'Cantidad NC']
+                df_trab = df_trab.sort_values('Cantidad NC', ascending=True)
+                
+                fig_trab = px.bar(df_trab, x='Cantidad NC', y='Trabajador', orientation='h', 
+                                  title='Top 5 Trabajadores con Desviaciones', text_auto=True,
+                                  color_discrete_sequence=['#ffa15a'])
+                fig_trab.update_layout(yaxis_title=None, xaxis_title="N° de Desviaciones")
+                st.plotly_chart(fig_trab, use_container_width=True)
+
+            col_graf3, col_graf4 = st.columns(2)
+
+            with col_graf3:
+                df_turno = df_nc['turno_final'].value_counts().reset_index().head(5)
+                df_turno.columns = ['Turno', 'Cantidad NC']
+                
+                fig_turno = px.bar(df_turno, x='Turno', y='Cantidad NC', 
+                                   title='Desviaciones por Turno', text_auto=True,
+                                   color_discrete_sequence=['#636efa'])
+                fig_turno.update_layout(xaxis_title="Turno", yaxis_title="N° de Desviaciones")
+                st.plotly_chart(fig_turno, use_container_width=True)
+
+            with col_graf4:
+                df_area = df_nc['area'].value_counts().reset_index()
+                df_area.columns = ['Área', 'Cantidad NC']
+                
+                fig_area = px.pie(df_area, values='Cantidad NC', names='Área', 
+                                  title='Distribución de Desviaciones por Área',
+                                  hole=0.3) 
+                fig_area.update_traces(textposition='inside', textinfo='value+label')
+                st.plotly_chart(fig_area, use_container_width=True)
