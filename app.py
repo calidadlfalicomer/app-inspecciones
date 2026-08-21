@@ -119,13 +119,17 @@ elif menu == "📝 Ingreso de Inspección":
                 else:
                     pin_real = monitores_db[monitores_db['Nombre'] == usuario_intento]['PIN'].values[0]
                     
-                    if str(pin_intento).strip() == str(pin_real).strip():
+                    # Limpiamos el ".0" fantasma que agrega Pandas desde el Excel
+                    pin_real_str = str(pin_real).strip()
+                    if pin_real_str.endswith('.0'):
+                        pin_real_str = pin_real_str[:-2]
+                    
+                    if str(pin_intento).strip() == pin_real_str:
                         st.session_state['autenticado'] = True
                         st.session_state['monitor_activo'] = usuario_intento
                         st.rerun()
                     else:
                         st.error("❌ PIN incorrecto.")
-
     # --- FORMULARIO DE INSPECCIÓN (SI ESTÁ AUTENTICADO) ---
     else:
         lista_trabajadores = df_personal[df_personal['Rol'] == 'Trabajador']['Nombre'].str.strip().drop_duplicates().sort_values().tolist()
