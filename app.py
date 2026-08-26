@@ -26,7 +26,7 @@ st.sidebar.title("Sistema de Gestión")
 menu = st.sidebar.radio("Navegación:", ["📝 Ingreso de Inspección", "⚙️ Mantenedor de Personal", "📊 Panel de Métricas"], key="menu_principal")
 
 # ==========================================
-# PANTALLA 1: MANTENEDOR DE PERSONAL (MODO ADMIN)
+# PANTALLA 1: MANTENEDOR DE PERSONAL Y MIGRACIÓN
 # ==========================================
 if menu == "⚙️ Mantenedor de Personal":
     st.title("⚙️ Mantenedor de Personal")
@@ -94,6 +94,86 @@ if menu == "⚙️ Mantenedor de Personal":
                     st.error(f"❌ Error al agregar. Detalle: {e}")
             else:
                 st.warning("⚠️ Debe ingresar Planta, Nombre y Apellido obligatoriamente.")
+                
+        st.divider()
+
+        # --- OPCIÓN 3: EL TRADUCTOR Y MIGRADOR HISTÓRICO ---
+        st.subheader("Opción 3: Migración de Historial (Desde AppSheet)")
+        st.warning("⚠️ Asegúrate de haber agregado la columna 'Planta' a tu Excel antiguo antes de subirlo.")
+        archivo_historico = st.file_uploader("Cargar Historial Excel (AppSheet)", type=["xlsx", "xls"], key="hist")
+
+        if archivo_historico is not None:
+            if st.button("Procesar y Migrar Datos", type="primary"):
+                try:
+                    df_hist = pd.read_excel(archivo_historico)
+                    
+                    if 'Planta' not in df_hist.columns:
+                        st.error("❌ El Excel no tiene la columna 'Planta'. Agrégala e inténtalo de nuevo.")
+                    else:
+                        with st.spinner("Traduciendo formato AppSheet a BD Relacional..."):
+                            df_hist['nuevo_id_uuid'] = [str(uuid.uuid4()) for _ in range(len(df_hist))]
+                            
+                            # 1. AISLAR LA CABECERA
+                            df_cab = pd.DataFrame()
+                            df_cab['id_registro'] = df_hist['nuevo_id_uuid']
+                            df_cab['planta'] = df_hist['Planta']
+                            df_cab['fecha_hora'] = pd.to_datetime(df_hist['Fecha_y_Hora']).astype(str)
+                            df_cab['monitor'] = df_hist['Monitor'].str.title()
+                            df_cab['trabajador_evaluado'] = df_hist['Trabajador_Evaluado'].str.title()
+                            df_cab['turno_final'] = df_hist['Turno_Final'].astype(str)
+                            df_cab['area'] = df_hist['Area']
+                            
+                            # 2. DICCIONARIO PARA TRADUCIR ENCABEZADOS ANTIGUOS A NUEVOS
+                            mapa_preguntas = {
+                                "1_Manos_Limpias": "1_Manos_Limpias",
+                                "2_Pelo_Tomado_y_Cofia": "2_Pelo_Tomado_y_Cofia",
+                                "3_Uñas_Cortas_y_Sin_Esmalte": "3_Uñas_Cortas_y_Sin_Esmalte",
+                                "4_Sin_Heridas_Ni_Cortes": "4_Sin_Heridas_Ni_Cortes",
+                                "5_Uniforme_Limpio_y_Buen_Estado": "5_Uniforme_Limpio_y_Buen_Estado",
+                                "6_Lentes_Opticos_Buen_Estado": "6_Lentes_Opticos_Buen_Estado",
+                                "7_Sin_Maquillaje_Barba_Pestañas": "7_Sin_Maquillaje_Barba_Pestañas",
+                                "8_Celular, Parlante y/o Audifonos": "8_Celular_Parlante_y/o_Audifonos",
+                                "9_Joyas y Accesorios": "9_Joyas_y_Accesorios",
+                                "10_Buen_Estado_Salud": "10_Buen_Estado_Salud",
+                                "11_Consumo de Alimentos y bebidas": "11_Consumo_de_Alimentos_y_bebidas"
+                            }
+                            
+                            # 3. AISLAR Y TRANSFORMAR LOS DETALLES
+                            detalles = []
+                            for idx, row in df_hist.iterrows():
+                                id_reg = row['nuevo_id_uuid']
+                                accion_gen = str(row.get('Accion_Correctiva', 'Ninguna'))
+                                if accion_gen.strip().lower() in ['nan', 'none', '']: 
+                                    accion_gen = 'Ninguna'
+                                
+                                for col_excel, param_db in mapa_preguntas.items():
+                                    if col_excel in row:
+                                        evaluacion = str(row[col_excel]).strip().upper()
+                                        if evaluacion not in ['CUMPLE', 'NO CUMPLE', 'NO APLICA']:
+                                            evaluacion = 'CUMPLE' 
+                                            
+                                        # Asigna la acción correctiva SOLO si no cumple
+                                        acc = accion_gen if evaluacion == 'NO CUMPLE' else 'Ninguna'
+                                        
+                                        detalles.append({
+                                            'id_registro': id_reg,
+                                            'parametro': param_db,
+                                            'evaluacion': evaluacion,
+                                            'accion_correctiva': acc
+                                        })
+                            
+                            df_det = pd.DataFrame(detalles)
+                            
+                            # 4. INYECCIÓN A SUPABASE
+                            engine = create_engine(db_url)
+                            df_cab.to_sql('inspecciones_cabecera_v2', engine, if_exists='append', index=False)
+                            df_det.to_sql('inspecciones_detalle_v2', engine, if_exists='append', index=False)
+                            
+                            st.cache_data.clear()
+                            st.success(f"✅ ¡Magnífico! Se migró el historial de {len(df_cab)} inspecciones a la nube.")
+                            
+                except Exception as e:
+                    st.error(f"❌ Ocurrió un error en la traducción: {e}")
 
 # ==========================================
 # PANTALLA 2: INGRESO DE INSPECCIÓN (LOGIN DE MONITORES)
