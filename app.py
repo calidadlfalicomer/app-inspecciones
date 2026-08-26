@@ -4,7 +4,6 @@ import pandas as pd
 from sqlalchemy import create_engine
 import uuid
 import time
-import plotly.express as px
 
 # --- 1. CONEXIÓN A LA BASE DE DATOS ---
 db_url = "postgresql://postgres.gejkgyqrnmetjdguekvt:Alicomer2027%23@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
@@ -23,7 +22,7 @@ if 'llave_reinicio' not in st.session_state:
 
 # --- 3. MENÚ LATERAL ---
 st.sidebar.title("Sistema de Gestión")
-menu = st.sidebar.radio("Navegación:", ["📝 Ingreso de Inspección", "⚙️ Mantenedor de Personal", "📊 Panel de Métricas"], key="menu_principal")
+menu = st.sidebar.radio("Navegación:", ["📝 Ingreso de Inspección", "⚙️ Mantenedor de Personal"], key="menu_principal")
 
 # ==========================================
 # PANTALLA 1: MANTENEDOR DE PERSONAL Y MIGRACIÓN
@@ -58,43 +57,8 @@ if menu == "⚙️ Mantenedor de Personal":
 
         st.divider()
 
-        st.subheader("Opción 2: Ingreso Rápido Manual")
-        
-        col_pl, col_r = st.columns(2)
-        with col_pl:
-            nueva_planta = st.text_input("Planta (Ej: Alicomer o AMBAS)")
-        with col_r:
-            nuevo_rol = st.selectbox("Rol", ["Monitor", "Trabajador"])
-            
-        col_n1, col_n2, col_p = st.columns([1.5, 1.5, 1])
-        with col_n1:
-            nuevo_nombre = st.text_input("Nombre(s)")
-        with col_n2:
-            nuevo_apellido = st.text_input("Apellido(s)")
-        with col_p:
-            nuevo_pin = st.text_input("PIN (Solo monitores)", max_chars=4, type="password")
-
-        if st.button("Agregar Persona"):
-            if nuevo_nombre.strip() != "" and nuevo_apellido.strip() != "" and nueva_planta.strip() != "":
-                nombre_completo = f"{nuevo_nombre.strip()} {nuevo_apellido.strip()}".title()
-                planta_limpia = nueva_planta.strip().upper() if nueva_planta.strip().upper() == "AMBAS" else nueva_planta.strip().title()
-                pin_final = nuevo_pin if nuevo_rol == "Monitor" else None
-                
-                nuevo_registro_personal = pd.DataFrame([{'Planta': planta_limpia, 'Rol': nuevo_rol, 'Nombre': nombre_completo, 'PIN': pin_final}])
-
-                try:
-                    engine = create_engine(db_url)
-                    nuevo_registro_personal.to_sql('maestro_personal', engine, if_exists='append', index=False)
-                    st.cache_data.clear()
-                    st.success(f"✅ {nombre_completo} agregado exitosamente a {planta_limpia}.")
-                except Exception as e:
-                    st.error(f"❌ Error al agregar. Detalle: {e}")
-            else:
-                st.warning("⚠️ Debe ingresar Planta, Nombre y Apellido obligatoriamente.")
-                
-        st.divider()
-
-        st.subheader("Opción 3: Migración de Historial (Desde AppSheet)")
+        # --- OPCIÓN 2: EL TRADUCTOR Y MIGRADOR HISTÓRICO ---
+        st.subheader("Opción 2: Migración de Historial (Desde AppSheet)")
         st.warning("⚠️ Asegúrate de haber agregado la columna 'Planta' a tu Excel antiguo antes de subirlo.")
         archivo_historico = st.file_uploader("Cargar Historial Excel (AppSheet)", type=["xlsx", "xls"], key="hist")
 
@@ -403,153 +367,3 @@ elif menu == "📝 Ingreso de Inspección":
                         st.warning("⚠️ El registro ya fue guardado correctamente. Evite hacer doble clic.")
                     else:
                         st.error(f"❌ Error al guardar en la base de datos: {e}")
-
-# ==========================================
-# PANTALLA 3: PANEL DE MÉTRICAS (DATA STUDIO)
-# ==========================================
-elif menu == "📊 Panel de Métricas":
-    st.title("📊 Panel de Métricas de Higiene")
-    
-    @st.cache_data(ttl=60)
-    def cargar_datos_completos():
-        try:
-            engine = create_engine(db_url)
-            query = """
-                SELECT 
-                    c.planta, c.fecha_hora, c.monitor, c.trabajador_evaluado, 
-                    c.turno_final, c.area, d.parametro, d.evaluacion, d.accion_correctiva 
-                FROM inspecciones_cabecera_v2 c
-                JOIN inspecciones_detalle_v2 d ON c.id_registro = d.id_registro
-            """
-            df = pd.read_sql(query, engine)
-            df['fecha_hora'] = pd.to_datetime(df['fecha_hora'])
-            return df
-        except Exception as e:
-            st.error(f"Error al cargar datos: {e}")
-            return pd.DataFrame()
-
-    df_total = cargar_datos_completos()
-
-    if df_total.empty:
-        st.info("Aún no hay registros en la nueva base de datos Multi-Planta para mostrar.")
-    else:
-        st.subheader("Filtros Generales")
-        col_f1, col_f2 = st.columns(2)
-        
-        with col_f1:
-            lista_plantas = ["Todas las Plantas"] + list(df_total['planta'].dropna().unique())
-            planta_filtro = st.selectbox("🏢 Seleccionar Planta", lista_plantas)
-        
-        with col_f2:
-            min_date = df_total['fecha_hora'].min().date()
-            max_date = df_total['fecha_hora'].max().date()
-            
-            rango_fechas = st.date_input(
-                "📅 Rango de Fechas (Inicio - Fin)",
-                value=(min_date, max_date),
-                min_value=min_date,
-                max_value=max_date
-            )
-
-        # 1. APLICAR FILTROS GLOBALES
-        df_filtrado = df_total.copy()
-        
-        if planta_filtro != "Todas las Plantas":
-            df_filtrado = df_filtrado[df_filtrado['planta'] == planta_filtro]
-            
-        if isinstance(rango_fechas, tuple):
-            if len(rango_fechas) == 2:
-                fecha_inicio, fecha_fin = rango_fechas
-                df_filtrado = df_filtrado[
-                    (df_filtrado['fecha_hora'].dt.date >= fecha_inicio) & 
-                    (df_filtrado['fecha_hora'].dt.date <= fecha_fin)
-                ]
-            elif len(rango_fechas) == 1:
-                fecha_inicio = rango_fechas[0]
-                df_filtrado = df_filtrado[df_filtrado['fecha_hora'].dt.date == fecha_inicio]
-
-        # --- NUEVO: SEGMENTADORES DINÁMICOS TIPO DATA STUDIO ---
-        st.divider()
-        st.subheader("🔍 Filtros de Profundidad (Drill-Down)")
-        st.write("Usa estos selectores para hacer un 'zoom' específico. Los gráficos se ajustarán automáticamente.")
-        
-        col_d1, col_d2, col_d3 = st.columns(3)
-        with col_d1:
-            trabajadores_disp = sorted(df_filtrado['trabajador_evaluado'].dropna().unique())
-            trabajador_filtro = st.multiselect("👤 Trabajador(es)", trabajadores_disp, placeholder="Todos")
-        
-        with col_d2:
-            areas_disp = sorted(df_filtrado['area'].dropna().unique())
-            area_filtro = st.multiselect("📍 Área(s)", areas_disp, placeholder="Todas")
-            
-        with col_d3:
-            turnos_disp = sorted(df_filtrado['turno_final'].dropna().unique())
-            turno_filtro = st.multiselect("⏱️ Turno(s)", turnos_disp, placeholder="Todos")
-
-        # 2. APLICAR FILTROS DE PROFUNDIDAD
-        if trabajador_filtro:
-            df_filtrado = df_filtrado[df_filtrado['trabajador_evaluado'].isin(trabajador_filtro)]
-        if area_filtro:
-            df_filtrado = df_filtrado[df_filtrado['area'].isin(area_filtro)]
-        if turno_filtro:
-            df_filtrado = df_filtrado[df_filtrado['turno_final'].isin(turno_filtro)]
-
-        st.divider()
-
-        df_nc = df_filtrado[df_filtrado['evaluacion'] == 'NO CUMPLE']
-
-        if df_nc.empty:
-            st.success("🎉 ¡Excelente! No hay registros de 'NO CUMPLE' para la selección actual.")
-        else:
-            st.subheader(f"Análisis de Desviaciones Absolutas (Total: {len(df_nc)} No Cumple)")
-            
-            # --- FILA 1: PARÁMETROS Y TURNOS ---
-            col_graf1, col_graf2 = st.columns(2)
-
-            with col_graf1:
-                df_param = df_nc['parametro'].value_counts().reset_index().head(5)
-                df_param.columns = ['Parámetro', 'Cantidad NC']
-                df_param = df_param.sort_values('Cantidad NC', ascending=True) 
-                
-                fig_param = px.bar(df_param, x='Cantidad NC', y='Parámetro', orientation='h', 
-                                   title='Top 5 Dimensiones Críticas', text_auto=True,
-                                   color_discrete_sequence=['#4285F4'])
-                fig_param.update_layout(yaxis_title=None, xaxis_title="N° de Desviaciones")
-                fig_param.update_xaxes(tickformat="d") 
-                st.plotly_chart(fig_param, use_container_width=True)
-
-            with col_graf2:
-                df_turno = df_nc['turno_final'].value_counts().reset_index().head(5)
-                df_turno.columns = ['Turno', 'Cantidad NC']
-                
-                fig_turno = px.bar(df_turno, x='Turno', y='Cantidad NC', 
-                                   title='Desviaciones por Turno', text_auto=True,
-                                   color_discrete_sequence=['#4285F4'])
-                fig_turno.update_layout(xaxis_title="Turno", yaxis_title="N° de Desviaciones")
-                fig_turno.update_yaxes(tickformat="d") 
-                st.plotly_chart(fig_turno, use_container_width=True)
-
-            # --- FILA 2: TRABAJADORES Y ÁREAS ---
-            col_graf3, col_graf4 = st.columns(2)
-
-            with col_graf3:
-                df_trab = df_nc['trabajador_evaluado'].value_counts().reset_index().head(5)
-                df_trab.columns = ['Trabajador', 'Cantidad NC']
-                df_trab = df_trab.sort_values('Cantidad NC', ascending=True)
-                
-                fig_trab = px.bar(df_trab, x='Cantidad NC', y='Trabajador', orientation='h', 
-                                  title='Top 5 Trabajadores con Desviaciones', text_auto=True,
-                                  color_discrete_sequence=['#4285F4'])
-                fig_trab.update_layout(yaxis_title=None, xaxis_title="N° de Desviaciones")
-                fig_trab.update_xaxes(tickformat="d") 
-                st.plotly_chart(fig_trab, use_container_width=True)
-
-            with col_graf4:
-                df_area = df_nc['area'].value_counts().reset_index()
-                df_area.columns = ['Área', 'Cantidad NC']
-                
-                fig_area = px.pie(df_area, values='Cantidad NC', names='Área', 
-                                  title='Distribución de Desviaciones por Área',
-                                  hole=0.3) 
-                fig_area.update_traces(textposition='inside', textinfo='percent+label')
-                st.plotly_chart(fig_area, use_container_width=True)
