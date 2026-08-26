@@ -156,11 +156,14 @@ elif menu == "📝 Ingreso de Inspección":
         st.title("Checklist de Higiene R.P-15.02")
         st.subheader("Datos Generales")
 
+        # --- HORA CHILENA FORZADA PARA MOSTRAR ---
+        ahora_chile = pd.Timestamp.now(tz='America/Santiago')
+
         col1, col2 = st.columns(2)
         with col1:
-            fecha = st.date_input("Fecha", datetime.date.today(), disabled=True, key=f"fecha_{st.session_state['llave_reinicio']}")
+            st.text_input("Fecha", ahora_chile.strftime("%d-%m-%Y"), disabled=True, key=f"f_{st.session_state['llave_reinicio']}")
         with col2:
-            hora = st.time_input("Hora", datetime.datetime.now().time(), disabled=True, key=f"hora_{st.session_state['llave_reinicio']}")
+            st.text_input("Hora de apertura", ahora_chile.strftime("%H:%M"), disabled=True, key=f"h_{st.session_state['llave_reinicio']}")
 
         col_p, col_m, col_t = st.columns([1, 1.5, 1.5])
         
@@ -284,13 +287,16 @@ elif menu == "📝 Ingreso de Inspección":
                 st.error("⚠️ ERROR: Ha marcado 'NO CUMPLE' pero le falta seleccionar la acción correctiva. Revise el formulario antes de guardar.")
             else:
                 turno_final = f"{turno_letra}{turno_numero}"
-                fecha_hora_str = f"{fecha} {hora}" 
+                
+                # --- HORA CHILENA EXACTA DE GUARDADO ---
+                momento_exacto_guardado = pd.Timestamp.now(tz='America/Santiago').strftime("%Y-%m-%d %H:%M:%S")
+                
                 nuevo_id = st.session_state['id_actual'] 
 
                 nuevo_registro_cabecera = pd.DataFrame([{
                     'id_registro': nuevo_id,
                     'planta': planta_final,
-                    'fecha_hora': fecha_hora_str, 
+                    'fecha_hora': momento_exacto_guardado, 
                     'monitor': monitor,
                     'trabajador_evaluado': trabajador, 
                     'turno_final': turno_final, 
@@ -387,6 +393,7 @@ elif menu == "📊 Panel de Métricas":
         else:
             st.subheader(f"Análisis de Desviaciones Absolutas (Total: {len(df_nc)} No Cumple)")
             
+            # --- FILA 1: PARÁMETROS Y TURNOS ---
             col_graf1, col_graf2 = st.columns(2)
 
             with col_graf1:
@@ -396,32 +403,36 @@ elif menu == "📊 Panel de Métricas":
                 
                 fig_param = px.bar(df_param, x='Cantidad NC', y='Parámetro', orientation='h', 
                                    title='Top 5 Dimensiones Críticas', text_auto=True,
-                                   color_discrete_sequence=['#ef553b'])
+                                   color_discrete_sequence=['#4285F4'])
                 fig_param.update_layout(yaxis_title=None, xaxis_title="N° de Desviaciones")
+                fig_param.update_xaxes(tickformat="d") # Elimina decimales
                 st.plotly_chart(fig_param, use_container_width=True)
 
             with col_graf2:
+                df_turno = df_nc['turno_final'].value_counts().reset_index().head(5)
+                df_turno.columns = ['Turno', 'Cantidad NC']
+                
+                fig_turno = px.bar(df_turno, x='Turno', y='Cantidad NC', 
+                                   title='Desviaciones por Turno', text_auto=True,
+                                   color_discrete_sequence=['#4285F4'])
+                fig_turno.update_layout(xaxis_title="Turno", yaxis_title="N° de Desviaciones")
+                fig_turno.update_yaxes(tickformat="d") # Elimina decimales
+                st.plotly_chart(fig_turno, use_container_width=True)
+
+            # --- FILA 2: TRABAJADORES Y ÁREAS ---
+            col_graf3, col_graf4 = st.columns(2)
+
+            with col_graf3:
                 df_trab = df_nc['trabajador_evaluado'].value_counts().reset_index().head(5)
                 df_trab.columns = ['Trabajador', 'Cantidad NC']
                 df_trab = df_trab.sort_values('Cantidad NC', ascending=True)
                 
                 fig_trab = px.bar(df_trab, x='Cantidad NC', y='Trabajador', orientation='h', 
                                   title='Top 5 Trabajadores con Desviaciones', text_auto=True,
-                                  color_discrete_sequence=['#ffa15a'])
+                                  color_discrete_sequence=['#4285F4'])
                 fig_trab.update_layout(yaxis_title=None, xaxis_title="N° de Desviaciones")
+                fig_trab.update_xaxes(tickformat="d") # Elimina decimales
                 st.plotly_chart(fig_trab, use_container_width=True)
-
-            col_graf3, col_graf4 = st.columns(2)
-
-            with col_graf3:
-                df_turno = df_nc['turno_final'].value_counts().reset_index().head(5)
-                df_turno.columns = ['Turno', 'Cantidad NC']
-                
-                fig_turno = px.bar(df_turno, x='Turno', y='Cantidad NC', 
-                                   title='Desviaciones por Turno', text_auto=True,
-                                   color_discrete_sequence=['#636efa'])
-                fig_turno.update_layout(xaxis_title="Turno", yaxis_title="N° de Desviaciones")
-                st.plotly_chart(fig_turno, use_container_width=True)
 
             with col_graf4:
                 df_area = df_nc['area'].value_counts().reset_index()
@@ -430,5 +441,5 @@ elif menu == "📊 Panel de Métricas":
                 fig_area = px.pie(df_area, values='Cantidad NC', names='Área', 
                                   title='Distribución de Desviaciones por Área',
                                   hole=0.3) 
-                fig_area.update_traces(textposition='inside', textinfo='value+label')
+                fig_area.update_traces(textposition='inside', textinfo='percent+label')
                 st.plotly_chart(fig_area, use_container_width=True)
