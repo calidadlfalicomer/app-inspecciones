@@ -60,7 +60,6 @@ if menu == "⚙️ Mantenedor de Personal":
 
         st.subheader("Opción 2: Ingreso Rápido Manual")
         
-        # ESTRUCTURA DIVIDIDA PARA EL NOMBRE
         col_pl, col_r = st.columns(2)
         with col_pl:
             nueva_planta = st.text_input("Planta (Ej: Alicomer o AMBAS)")
@@ -77,8 +76,6 @@ if menu == "⚙️ Mantenedor de Personal":
 
         if st.button("Agregar Persona"):
             if nuevo_nombre.strip() != "" and nuevo_apellido.strip() != "" and nueva_planta.strip() != "":
-                
-                # UNIÓN Y FORMATO AUTOMÁTICO (Ej: Juan Perez)
                 nombre_completo = f"{nuevo_nombre.strip()} {nuevo_apellido.strip()}".title()
                 planta_limpia = nueva_planta.strip().upper() if nueva_planta.strip().upper() == "AMBAS" else nueva_planta.strip().title()
                 pin_final = nuevo_pin if nuevo_rol == "Monitor" else None
@@ -97,7 +94,6 @@ if menu == "⚙️ Mantenedor de Personal":
                 
         st.divider()
 
-        # --- OPCIÓN 3: EL TRADUCTOR Y MIGRADOR HISTÓRICO ---
         st.subheader("Opción 3: Migración de Historial (Desde AppSheet)")
         st.warning("⚠️ Asegúrate de haber agregado la columna 'Planta' a tu Excel antiguo antes de subirlo.")
         archivo_historico = st.file_uploader("Cargar Historial Excel (AppSheet)", type=["xlsx", "xls"], key="hist")
@@ -113,7 +109,6 @@ if menu == "⚙️ Mantenedor de Personal":
                         with st.spinner("Traduciendo formato AppSheet a BD Relacional..."):
                             df_hist['nuevo_id_uuid'] = [str(uuid.uuid4()) for _ in range(len(df_hist))]
                             
-                            # 1. AISLAR LA CABECERA
                             df_cab = pd.DataFrame()
                             df_cab['id_registro'] = df_hist['nuevo_id_uuid']
                             df_cab['planta'] = df_hist['Planta']
@@ -123,7 +118,6 @@ if menu == "⚙️ Mantenedor de Personal":
                             df_cab['turno_final'] = df_hist['Turno_Final'].astype(str)
                             df_cab['area'] = df_hist['Area']
                             
-                            # 2. DICCIONARIO PARA TRADUCIR ENCABEZADOS ANTIGUOS A NUEVOS
                             mapa_preguntas = {
                                 "1_Manos_Limpias": "1_Manos_Limpias",
                                 "2_Pelo_Tomado_y_Cofia": "2_Pelo_Tomado_y_Cofia",
@@ -138,7 +132,6 @@ if menu == "⚙️ Mantenedor de Personal":
                                 "11_Consumo de Alimentos y bebidas": "11_Consumo_de_Alimentos_y_bebidas"
                             }
                             
-                            # 3. AISLAR Y TRANSFORMAR LOS DETALLES
                             detalles = []
                             for idx, row in df_hist.iterrows():
                                 id_reg = row['nuevo_id_uuid']
@@ -152,7 +145,6 @@ if menu == "⚙️ Mantenedor de Personal":
                                         if evaluacion not in ['CUMPLE', 'NO CUMPLE', 'NO APLICA']:
                                             evaluacion = 'CUMPLE' 
                                             
-                                        # Asigna la acción correctiva SOLO si no cumple
                                         acc = accion_gen if evaluacion == 'NO CUMPLE' else 'Ninguna'
                                         
                                         detalles.append({
@@ -164,7 +156,6 @@ if menu == "⚙️ Mantenedor de Personal":
                             
                             df_det = pd.DataFrame(detalles)
                             
-                            # 4. INYECCIÓN A SUPABASE
                             engine = create_engine(db_url)
                             df_cab.to_sql('inspecciones_cabecera_v2', engine, if_exists='append', index=False)
                             df_det.to_sql('inspecciones_detalle_v2', engine, if_exists='append', index=False)
@@ -236,7 +227,6 @@ elif menu == "📝 Ingreso de Inspección":
         st.title("Checklist de Higiene R.P-15.02")
         st.subheader("Datos Generales")
 
-        # --- HORA CHILENA FORZADA PARA MOSTRAR ---
         ahora_chile = pd.Timestamp.now(tz='America/Santiago')
 
         col1, col2 = st.columns(2)
@@ -269,7 +259,6 @@ elif menu == "📝 Ingreso de Inspección":
         with col_t:
             trabajador = st.selectbox("Trabajador Evaluado*", lista_trabajadores, index=None, placeholder="--- Seleccione Trabajador ---", key=f"sel_t_{st.session_state['llave_reinicio']}")        
         
-        # --- MINI-MANTENEDOR DIVIDIDO EN NOMBRE Y APELLIDO ---
         if planta_final:
             with st.expander("➕ ¿Falta personal? Agregar nuevo trabajador a la lista"):
                 col_n1, col_n2 = st.columns(2)
@@ -281,7 +270,6 @@ elif menu == "📝 Ingreso de Inspección":
                 if st.button("Guardar y Actualizar Lista", type="secondary"):
                     if nuevo_nombre_rapido.strip() != "" and nuevo_apellido_rapido.strip() != "":
                         
-                        # UNE Y FORMATEA (Pone las mayúsculas correctas automáticamente)
                         nombre_completo_rapido = f"{nuevo_nombre_rapido.strip()} {nuevo_apellido_rapido.strip()}".title()
                         
                         nuevo_registro = pd.DataFrame([{
@@ -302,7 +290,6 @@ elif menu == "📝 Ingreso de Inspección":
                             st.error(f"❌ Error al agregar: {e}")
                     else:
                         st.warning("⚠️ Debe ingresar el Nombre y el Apellido en ambas casillas para poder guardar.")
-        # -----------------------------------------------------
 
         st.write("Turno*")
         col_t1, col_t2 = st.columns(2)
@@ -368,7 +355,6 @@ elif menu == "📝 Ingreso de Inspección":
             else:
                 turno_final = f"{turno_letra}{turno_numero}"
                 
-                # --- HORA CHILENA EXACTA DE GUARDADO ---
                 momento_exacto_guardado = pd.Timestamp.now(tz='America/Santiago').strftime("%Y-%m-%d %H:%M:%S")
                 
                 nuevo_id = st.session_state['id_actual'] 
@@ -455,14 +441,36 @@ elif menu == "📊 Panel de Métricas":
             planta_filtro = st.selectbox("🏢 Seleccionar Planta", lista_plantas)
         
         with col_f2:
-            meses_disponibles = df_total['fecha_hora'].dt.to_period('M').unique()
-            mes_filtro = st.selectbox("📅 Mes de Análisis", ["Todos"] + list(meses_disponibles))
+            # --- NUEVO FILTRO CON CALENDARIO (RANGO DE FECHAS) ---
+            min_date = df_total['fecha_hora'].min().date()
+            max_date = df_total['fecha_hora'].max().date()
+            
+            rango_fechas = st.date_input(
+                "📅 Rango de Fechas (Inicio - Fin)",
+                value=(min_date, max_date),
+                min_value=min_date,
+                max_value=max_date
+            )
 
+        # APLICAR LOS FILTROS
         df_filtrado = df_total.copy()
+        
         if planta_filtro != "Todas las Plantas":
             df_filtrado = df_filtrado[df_filtrado['planta'] == planta_filtro]
-        if mes_filtro != "Todos":
-            df_filtrado = df_filtrado[df_filtrado['fecha_hora'].dt.to_period('M') == mes_filtro]
+            
+        # Lógica para procesar la selección del calendario
+        if isinstance(rango_fechas, tuple):
+            if len(rango_fechas) == 2:
+                # Se seleccionaron ambas fechas
+                fecha_inicio, fecha_fin = rango_fechas
+                df_filtrado = df_filtrado[
+                    (df_filtrado['fecha_hora'].dt.date >= fecha_inicio) & 
+                    (df_filtrado['fecha_hora'].dt.date <= fecha_fin)
+                ]
+            elif len(rango_fechas) == 1:
+                # El usuario hizo clic en la fecha de inicio pero aún no escoge el fin
+                fecha_inicio = rango_fechas[0]
+                df_filtrado = df_filtrado[df_filtrado['fecha_hora'].dt.date == fecha_inicio]
 
         st.divider()
 
@@ -485,7 +493,7 @@ elif menu == "📊 Panel de Métricas":
                                    title='Top 5 Dimensiones Críticas', text_auto=True,
                                    color_discrete_sequence=['#4285F4'])
                 fig_param.update_layout(yaxis_title=None, xaxis_title="N° de Desviaciones")
-                fig_param.update_xaxes(tickformat="d") # Elimina decimales
+                fig_param.update_xaxes(tickformat="d") 
                 st.plotly_chart(fig_param, use_container_width=True)
 
             with col_graf2:
@@ -496,7 +504,7 @@ elif menu == "📊 Panel de Métricas":
                                    title='Desviaciones por Turno', text_auto=True,
                                    color_discrete_sequence=['#4285F4'])
                 fig_turno.update_layout(xaxis_title="Turno", yaxis_title="N° de Desviaciones")
-                fig_turno.update_yaxes(tickformat="d") # Elimina decimales
+                fig_turno.update_yaxes(tickformat="d") 
                 st.plotly_chart(fig_turno, use_container_width=True)
 
             # --- FILA 2: TRABAJADORES Y ÁREAS ---
@@ -511,7 +519,7 @@ elif menu == "📊 Panel de Métricas":
                                   title='Top 5 Trabajadores con Desviaciones', text_auto=True,
                                   color_discrete_sequence=['#4285F4'])
                 fig_trab.update_layout(yaxis_title=None, xaxis_title="N° de Desviaciones")
-                fig_trab.update_xaxes(tickformat="d") # Elimina decimales
+                fig_trab.update_xaxes(tickformat="d") 
                 st.plotly_chart(fig_trab, use_container_width=True)
 
             with col_graf4:
