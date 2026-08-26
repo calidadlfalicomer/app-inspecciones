@@ -158,9 +158,9 @@ elif menu == "📝 Ingreso de Inspección":
 
         col1, col2 = st.columns(2)
         with col1:
-            fecha = st.date_input("Fecha", datetime.date.today(), disabled=True)
+            fecha = st.date_input("Fecha", datetime.date.today(), disabled=True, key=f"fecha_{st.session_state['llave_reinicio']}")
         with col2:
-            hora = st.time_input("Hora", datetime.datetime.now().time(), disabled=True)
+            hora = st.time_input("Hora", datetime.datetime.now().time(), disabled=True, key=f"hora_{st.session_state['llave_reinicio']}")
 
         col_p, col_m, col_t = st.columns([1, 1.5, 1.5])
         
