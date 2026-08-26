@@ -433,7 +433,7 @@ elif menu == "📊 Panel de Métricas":
     if df_total.empty:
         st.info("Aún no hay registros en la nueva base de datos Multi-Planta para mostrar.")
     else:
-        st.subheader("Filtros de Análisis")
+        st.subheader("Filtros Generales")
         col_f1, col_f2 = st.columns(2)
         
         with col_f1:
@@ -441,7 +441,6 @@ elif menu == "📊 Panel de Métricas":
             planta_filtro = st.selectbox("🏢 Seleccionar Planta", lista_plantas)
         
         with col_f2:
-            # --- NUEVO FILTRO CON CALENDARIO (RANGO DE FECHAS) ---
             min_date = df_total['fecha_hora'].min().date()
             max_date = df_total['fecha_hora'].max().date()
             
@@ -452,32 +451,55 @@ elif menu == "📊 Panel de Métricas":
                 max_value=max_date
             )
 
-        # APLICAR LOS FILTROS
+        # 1. APLICAR FILTROS GLOBALES
         df_filtrado = df_total.copy()
         
         if planta_filtro != "Todas las Plantas":
             df_filtrado = df_filtrado[df_filtrado['planta'] == planta_filtro]
             
-        # Lógica para procesar la selección del calendario
         if isinstance(rango_fechas, tuple):
             if len(rango_fechas) == 2:
-                # Se seleccionaron ambas fechas
                 fecha_inicio, fecha_fin = rango_fechas
                 df_filtrado = df_filtrado[
                     (df_filtrado['fecha_hora'].dt.date >= fecha_inicio) & 
                     (df_filtrado['fecha_hora'].dt.date <= fecha_fin)
                 ]
             elif len(rango_fechas) == 1:
-                # El usuario hizo clic en la fecha de inicio pero aún no escoge el fin
                 fecha_inicio = rango_fechas[0]
                 df_filtrado = df_filtrado[df_filtrado['fecha_hora'].dt.date == fecha_inicio]
+
+        # --- NUEVO: SEGMENTADORES DINÁMICOS TIPO DATA STUDIO ---
+        st.divider()
+        st.subheader("🔍 Filtros de Profundidad (Drill-Down)")
+        st.write("Usa estos selectores para hacer un 'zoom' específico. Los gráficos se ajustarán automáticamente.")
+        
+        col_d1, col_d2, col_d3 = st.columns(3)
+        with col_d1:
+            trabajadores_disp = sorted(df_filtrado['trabajador_evaluado'].dropna().unique())
+            trabajador_filtro = st.multiselect("👤 Trabajador(es)", trabajadores_disp, placeholder="Todos")
+        
+        with col_d2:
+            areas_disp = sorted(df_filtrado['area'].dropna().unique())
+            area_filtro = st.multiselect("📍 Área(s)", areas_disp, placeholder="Todas")
+            
+        with col_d3:
+            turnos_disp = sorted(df_filtrado['turno_final'].dropna().unique())
+            turno_filtro = st.multiselect("⏱️ Turno(s)", turnos_disp, placeholder="Todos")
+
+        # 2. APLICAR FILTROS DE PROFUNDIDAD
+        if trabajador_filtro:
+            df_filtrado = df_filtrado[df_filtrado['trabajador_evaluado'].isin(trabajador_filtro)]
+        if area_filtro:
+            df_filtrado = df_filtrado[df_filtrado['area'].isin(area_filtro)]
+        if turno_filtro:
+            df_filtrado = df_filtrado[df_filtrado['turno_final'].isin(turno_filtro)]
 
         st.divider()
 
         df_nc = df_filtrado[df_filtrado['evaluacion'] == 'NO CUMPLE']
 
         if df_nc.empty:
-            st.success("🎉 ¡Excelente! No hay registros de 'NO CUMPLE' en este periodo para la selección.")
+            st.success("🎉 ¡Excelente! No hay registros de 'NO CUMPLE' para la selección actual.")
         else:
             st.subheader(f"Análisis de Desviaciones Absolutas (Total: {len(df_nc)} No Cumple)")
             
