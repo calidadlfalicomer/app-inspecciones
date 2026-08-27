@@ -31,7 +31,7 @@ menu = st.sidebar.radio("Navegación:", ["📝 Formularios Operativos", "✅ Ver
 if menu == "⚙️ Mantenedor de Personal":
     st.title("⚙️ Mantenedor de Personal")
     
-    st.info("⚠️ Acceso restringido a Jefatura de Calidad.")
+    st.info("⚠️ Acceso restringido a Jefatura de Calidad Corporativa.")
     admin_pass = st.text_input("Ingrese contraseña de administrador:", type="password")
     
     if admin_pass == "Calidad2026": 
@@ -130,7 +130,6 @@ if menu == "⚙️ Mantenedor de Personal":
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error en la traducción: {e}")
 
-
 # ==========================================
 # PANTALLA 2: FORMULARIOS OPERATIVOS (CENTRAL DE REGISTROS)
 # ==========================================
@@ -189,7 +188,6 @@ elif menu == "📝 Formularios Operativos":
             st.session_state['planta_activa'] = None
             st.rerun()
 
-        # --- SELECTOR DE FORMULARIOS MULTIPLES ---
         st.sidebar.divider()
         formulario_elegido = st.sidebar.radio(
             "📋 SELECCIONE CHECKLIST:", 
@@ -245,15 +243,8 @@ elif menu == "📝 Formularios Operativos":
                     
                     if st.button("Guardar y Actualizar Lista", type="secondary"):
                         if nuevo_nombre_rapido.strip() != "" and nuevo_apellido_rapido.strip() != "":
-                            
                             nombre_completo_rapido = f"{nuevo_nombre_rapido.strip()} {nuevo_apellido_rapido.strip()}".title()
-                            
-                            nuevo_registro = pd.DataFrame([{
-                                'Planta': str(planta_final).title(), 
-                                'Rol': 'Trabajador', 
-                                'Nombre': nombre_completo_rapido, 
-                                'PIN': None
-                            }])
+                            nuevo_registro = pd.DataFrame([{'Planta': str(planta_final).title(), 'Rol': 'Trabajador', 'Nombre': nombre_completo_rapido, 'PIN': None}])
                             
                             try:
                                 engine = create_engine(db_url)
@@ -265,7 +256,7 @@ elif menu == "📝 Formularios Operativos":
                             except Exception as e:
                                 st.error(f"❌ Error al agregar: {e}")
                         else:
-                            st.warning("⚠️ Debe ingresar el Nombre y el Apellido en ambas casillas para poder guardar.")
+                            st.warning("⚠️ Debe ingresar Nombre y Apellido.")
 
             st.write("Turno*")
             col_t1, col_t2 = st.columns(2)
@@ -318,21 +309,12 @@ elif menu == "📝 Formularios Operativos":
 
                 st.write("---")
 
-            st.write("")
-
             if st.button("Guardar Inspección", type="primary", key="btn_guardar"):
-
-                if planta_final is None:
-                    st.error("⚠️ ERROR: Debe seleccionar la Planta antes de guardar.")
-                elif trabajador is None:
-                    st.error("⚠️ ERROR: Debe seleccionar un Trabajador Evaluado antes de guardar.")
-                elif None in acciones_seleccionadas.values():
-                    st.error("⚠️ ERROR: Ha marcado 'NO CUMPLE' pero le falta seleccionar la acción correctiva. Revise el formulario antes de guardar.")
+                if planta_final is None or trabajador is None or (None in acciones_seleccionadas.values()):
+                    st.error("⚠️ Faltan datos o acciones correctivas por completar.")
                 else:
                     turno_final = f"{turno_letra}{turno_numero}"
-                    
                     momento_exacto_guardado = pd.Timestamp.now(tz='America/Santiago').strftime("%Y-%m-%d %H:%M:%S")
-                    
                     nuevo_id = st.session_state['id_actual'] 
 
                     nuevo_registro_cabecera = pd.DataFrame([{
@@ -366,18 +348,13 @@ elif menu == "📝 Formularios Operativos":
                             nuevo_registro_cabecera.to_sql('inspecciones_cabecera_v2', engine, if_exists='append', index=False)
                             df_detalles.to_sql('inspecciones_detalle_v2', engine, if_exists='append', index=False)
 
-                        st.success(f"✅ ¡Registro guardado exitosamente! | Planta: {planta_final} | Turno: {turno_final}")
-                        
+                        st.success("✅ ¡Registro guardado exitosamente!")
                         st.session_state['id_actual'] = str(uuid.uuid4())
                         st.session_state['llave_reinicio'] += 1
-                        
                         time.sleep(1.5)
                         st.rerun() 
-
                     except Exception as e:
-                        if "UniqueViolation" in str(e):
-                            st.warning("⚠️ El registro ya fue guardado correctamente. Evite hacer doble clic.")
-                        else:
+                        if "UniqueViolation" not in str(e):
                             st.error(f"❌ Error al guardar en la base de datos: {e}")
 
         # ----------------------------------------------------------------------
@@ -388,52 +365,16 @@ elif menu == "📝 Formularios Operativos":
             st.subheader("Datos de la Inspección")
             
             diccionario_limpieza = {
-                "Masas": {
-                    "Diario": ["Mesones", "Cuchillos y Raspas", "Balanzas"],
-                    "Semanal": ["Pisos", "Muros", "Revolvedora", "Basurero"],
-                    "Quincenal": ["Cámara"],
-                    "Mensual": ["Cableado y Tubos PVC"],
-                    "Semestral": ["Techos"]
-                },
-                "Corte": {
-                    "Diario": ["Pisos", "Mesones", "Cuchillos y Raspas", "Balanzas"],
-                    "Semanal": ["Muros", "Cableado y Tubos PVC", "Chabatera", "Ovilladora", "Basurero"],
-                    "Semestral": ["Techos"]
-                },
-                "Horno": {
-                    "Diario": ["Pisos", "Mesones", "Cuchillos"],
-                    "Semanal": ["Muros", "Cableado y Tubos PVC", "Tunel / Abatidor", "Basurero"],
-                    "Mensual": ["Hornos"],
-                    "Semestral": ["Techo"]
-                },
-                "Envases": {
-                    "Diario": ["Pisos", "Mesones", "Balanzas"],
-                    "Semanal": ["Muros", "Cableado y Tubos PVC", "Basurero"],
-                    "Semestral": ["Techos"]
-                },
-                "Dosificado": {
-                    "Diario": ["Pisos", "Mesones", "Balanzas"],
-                    "Semanal": ["Muros", "Cableado y Tubos PVC", "Basurero"],
-                    "Semestral": ["Techos"]
-                },
-                "Bodega": {
-                    "Diario": ["Pisos"],
-                    "Semanal": ["Muros"]
-                },
-                "Cámara despacho": {
-                    "Diario": ["Pisos"],
-                    "Semanal": ["Muros", "Lamas", "Basurero"],
-                    "Quincenal": ["Traspaleta"]
-                },
-                "Baños": {
-                    "Diario": ["Mujer", "Hombre"]
-                },
-                "Comedor": {
-                    "Diario": ["Comedor"]
-                },
-                "Area externa": {
-                    "Diario": ["Pasillo Entrada", "Calle Exterior Planta", "Sector Merma"]
-                }
+                "Masas": {"Diario": ["Mesones", "Cuchillos y Raspas", "Balanzas"], "Semanal": ["Pisos", "Muros", "Revolvedora", "Basurero"], "Quincenal": ["Cámara"], "Mensual": ["Cableado y Tubos PVC"], "Semestral": ["Techos"]},
+                "Corte": {"Diario": ["Pisos", "Mesones", "Cuchillos y Raspas", "Balanzas"], "Semanal": ["Muros", "Cableado y Tubos PVC", "Chabatera", "Ovilladora", "Basurero"], "Semestral": ["Techos"]},
+                "Horno": {"Diario": ["Pisos", "Mesones", "Cuchillos"], "Semanal": ["Muros", "Cableado y Tubos PVC", "Tunel / Abatidor", "Basurero"], "Mensual": ["Hornos"], "Semestral": ["Techo"]},
+                "Envases": {"Diario": ["Pisos", "Mesones", "Balanzas"], "Semanal": ["Muros", "Cableado y Tubos PVC", "Basurero"], "Semestral": ["Techos"]},
+                "Dosificado": {"Diario": ["Pisos", "Mesones", "Balanzas"], "Semanal": ["Muros", "Cableado y Tubos PVC", "Basurero"], "Semestral": ["Techos"]},
+                "Bodega": {"Diario": ["Pisos"], "Semanal": ["Muros"]},
+                "Cámara despacho": {"Diario": ["Pisos"], "Semanal": ["Muros", "Lamas", "Basurero"], "Quincenal": ["Traspaleta"]},
+                "Baños": {"Diario": ["Mujer", "Hombre"]},
+                "Comedor": {"Diario": ["Comedor"]},
+                "Area externa": {"Diario": ["Pasillo Entrada", "Calle Exterior Planta", "Sector Merma"]}
             }
 
             ahora_chile = pd.Timestamp.now(tz='America/Santiago')
@@ -469,10 +410,8 @@ elif menu == "📝 Formularios Operativos":
                 equipos_a_evaluar = diccionario_limpieza[sector_sel][frecuencia_sel]
                 
                 lista_acciones_limpieza = [
-                    "1- Volver a limpiar y sanitizar", 
-                    "2- Capacitar al personal asignado", 
-                    "3- Revisión de procedimiento/metodología", 
-                    "4- Reforzar procedimiento eventual"
+                    "1- Volver a limpiar y sanitizar", "2- Capacitar al personal asignado", 
+                    "3- Revisión de procedimiento/metodología", "4- Reforzar procedimiento eventual"
                 ]
                 
                 respuestas_limpieza = {}
@@ -495,37 +434,24 @@ elif menu == "📝 Formularios Operativos":
                     st.write("---")
 
                 if st.button("Guardar Inspección de Limpieza", type="primary", key="btn_guardar_limp"):
-                    if planta_final_limpieza is None:
-                        st.error("⚠️ ERROR: Debe seleccionar la Planta.")
-                    elif "NO CUMPLE" in respuestas_limpieza.values() and None in acciones_limpieza.values():
-                        st.error("⚠️ Faltan acciones correctivas por justificar.")
+                    if planta_final_limpieza is None or ("NO CUMPLE" in respuestas_limpieza.values() and None in acciones_limpieza.values()):
+                        st.error("⚠️ Faltan datos o acciones correctivas.")
                     else:
                         momento_exacto_guardado = pd.Timestamp.now(tz='America/Santiago').strftime("%Y-%m-%d %H:%M:%S")
                         nuevo_id_limpieza = st.session_state['id_actual']
                         
-                        # Al guardar, inyectamos el estado "Pendiente" para que Jefatura lo vea
                         nuevo_registro_cabecera = pd.DataFrame([{
-                            'id_registro': nuevo_id_limpieza,
-                            'planta': planta_final_limpieza,
-                            'fecha_hora': momento_exacto_guardado,
-                            'monitor': st.session_state['monitor_activo'],
-                            'sector': sector_sel,
-                            'frecuencia': frecuencia_sel,
-                            'estado_verificacion': 'Pendiente',
-                            'verificado_por': None,
-                            'fecha_verificacion': None
+                            'id_registro': nuevo_id_limpieza, 'planta': planta_final_limpieza,
+                            'fecha_hora': momento_exacto_guardado, 'monitor': st.session_state['monitor_activo'],
+                            'sector': sector_sel, 'frecuencia': frecuencia_sel,
+                            'estado_verificacion': 'Pendiente', 'verificado_por': None, 'fecha_verificacion': None
                         }])
                         
                         detalles_lista = []
                         for equipo in equipos_a_evaluar:
-                            evaluacion_actual = respuestas_limpieza[equipo]
-                            accion = acciones_limpieza.get(equipo, "Ninguna")
-                            
                             detalles_lista.append({
-                                'id_registro': nuevo_id_limpieza,
-                                'equipo': equipo,
-                                'evaluacion': evaluacion_actual,
-                                'accion_correctiva': accion
+                                'id_registro': nuevo_id_limpieza, 'equipo': equipo,
+                                'evaluacion': respuestas_limpieza[equipo], 'accion_correctiva': acciones_limpieza.get(equipo, "Ninguna")
                             })
                             
                         df_detalles = pd.DataFrame(detalles_lista)
@@ -536,43 +462,60 @@ elif menu == "📝 Formularios Operativos":
                                 nuevo_registro_cabecera.to_sql('limpieza_cabecera', engine, if_exists='append', index=False)
                                 df_detalles.to_sql('limpieza_detalle', engine, if_exists='append', index=False)
 
-                            st.success(f"✅ ¡Registro guardado exitosamente! | Sector: {sector_sel}")
-                            
+                            st.success(f"✅ ¡Registro guardado exitosamente!")
                             st.session_state['id_actual'] = str(uuid.uuid4())
                             st.session_state['llave_reinicio'] += 1
-                            
                             time.sleep(1.5)
                             st.rerun() 
                         except Exception as e:
-                            if "UniqueViolation" in str(e):
-                                st.warning("⚠️ El registro ya fue guardado correctamente. Evite hacer doble clic.")
-                            else:
+                            if "UniqueViolation" not in str(e):
                                 st.error(f"❌ Error al guardar en la base de datos: {e}")
 
 # ==========================================
-# PANTALLA 3: VERIFICACIÓN JEFATURA (EL CEREBRO DE GESTIÓN)
+# PANTALLA 3: VERIFICACIÓN JEFATURA (JERARQUÍA Y ALERTAS)
 # ==========================================
 elif menu == "✅ Verificación Jefatura":
     st.title("✅ Panel de Jefatura (R.P-20.05)")
-    st.info("⚠️ Acceso restringido a Jefatura de Calidad.")
-    admin_pass = st.text_input("Ingrese contraseña de administrador:", type="password", key="pass_jefatura")
+    st.info("⚠️ Acceso restringido con credenciales directivas.")
     
-    if admin_pass == "Calidad2026":
-        st.success("Acceso concedido.")
+    col_perfil, col_pass = st.columns(2)
+    with col_perfil:
+        perfil_seleccionado = st.selectbox(
+            "👤 Seleccione su Perfil:",
+            ["--- Seleccione ---", "Lissette Dinamarca (La Florida)", "Lilian Rojas (Quilicura)", "Claudia Llaña (Corporativo)"]
+        )
+    with col_pass:
+        admin_pass = st.text_input("Ingrese su contraseña:", type="password", key="pass_jefatura")
+    
+    if perfil_seleccionado != "--- Seleccione ---" and admin_pass == "Calidad2026":
+        
+        if "Lissette" in perfil_seleccionado:
+            planta_permitida = "La Florida"
+            nombre_firma = "Lissette Dinamarca"
+        elif "Lilian" in perfil_seleccionado:
+            planta_permitida = "Quilicura"
+            nombre_firma = "Lilian Rojas"
+        else:
+            planta_permitida = "TODAS" 
+            nombre_firma = "Claudia Llaña"
+
+        st.success(f"Bienvenida, {nombre_firma}. Viendo datos de: {planta_permitida}")
         st.divider()
         
-        tab1, tab2 = st.tabs(["🚨 Alertas de Frecuencia", "✍️ Verificación de Registros"])
+        tab1, tab2 = st.tabs(["🚨 Alertas de Frecuencia", "✍️ Registros Pendientes por Firmar"])
         
-        # --- PESTAÑA 1: SEMÁFORO DE ALERTAS ---
         with tab1:
             st.subheader("Estado actual de limpieza por sector")
             try:
                 engine = create_engine(db_url)
-                # Buscamos cuándo fue la última vez que se hizo cada tarea
-                df_cab = pd.read_sql("SELECT planta, sector, frecuencia, fecha_hora FROM limpieza_cabecera", engine)
+                query_alertas = "SELECT planta, sector, frecuencia, fecha_hora FROM limpieza_cabecera"
+                if planta_permitida != "TODAS":
+                    query_alertas += f" WHERE planta = '{planta_permitida}'"
+                    
+                df_cab = pd.read_sql(query_alertas, engine)
                 
                 if df_cab.empty:
-                    st.info("Aún no hay registros de limpieza en la base de datos.")
+                    st.info(f"Aún no hay registros de limpieza para {planta_permitida}.")
                 else:
                     df_cab['fecha_hora_dt'] = pd.to_datetime(df_cab['fecha_hora'])
                     ultima_limpieza = df_cab.groupby(['planta', 'sector', 'frecuencia'])['fecha_hora_dt'].max().reset_index()
@@ -580,7 +523,6 @@ elif menu == "✅ Verificación Jefatura":
                     ahora = pd.Timestamp.now(tz='America/Santiago').tz_localize(None)
                     ultima_limpieza['dias_transcurridos'] = (ahora - ultima_limpieza['fecha_hora_dt']).dt.days
                     
-                    # Lógica del motor de alertas
                     limites = {"Diario": 1, "Semanal": 7, "Quincenal": 15, "Mensual": 30, "Semestral": 180}
                     
                     def estado_alerta(row):
@@ -596,58 +538,58 @@ elif menu == "✅ Verificación Jefatura":
                     ultima_limpieza['Estado'] = ultima_limpieza.apply(estado_alerta, axis=1)
                     ultima_limpieza['Última Limpieza'] = ultima_limpieza['fecha_hora_dt'].dt.strftime('%Y-%m-%d %H:%M')
                     
-                    # Mostrar el cuadro de mando
-                    st.dataframe(ultima_limpieza[['planta', 'sector', 'frecuencia', 'Última Limpieza', 'dias_transcurridos', 'Estado']].sort_values('Estado'), use_container_width=True)
+                    st.dataframe(ultima_limpieza[['planta', 'sector', 'frecuencia', 'Última Limpieza', 'dias_transcurridos', 'Estado']].sort_values(['Estado', 'dias_transcurridos'], ascending=[True, False]), use_container_width=True)
                     
             except Exception as e:
                 st.error(f"Error cargando alertas: {e}")
                 
-        # --- PESTAÑA 2: BANDEJA DE ENTRADA Y FIRMA ---
         with tab2:
-            st.subheader("Registros Pendientes de Revisión")
+            st.subheader(f"Bandeja de Entrada: {planta_permitida}")
             try:
                 engine = create_engine(db_url)
-                df_pendientes = pd.read_sql("SELECT * FROM limpieza_cabecera WHERE estado_verificacion = 'Pendiente' OR estado_verificacion IS NULL", engine)
+                
+                query_pendientes = "SELECT * FROM limpieza_cabecera WHERE (estado_verificacion = 'Pendiente' OR estado_verificacion IS NULL)"
+                if planta_permitida != "TODAS":
+                    query_pendientes += f" AND planta = '{planta_permitida}'"
+                    
+                df_pendientes = pd.read_sql(query_pendientes, engine)
                 
                 if df_pendientes.empty:
-                    st.success("🎉 ¡Todo al día! No hay registros pendientes de verificación.")
+                    st.success("🎉 ¡Todo al día! No hay registros pendientes de verificación en su bandeja.")
                 else:
                     df_pendientes = df_pendientes.sort_values('fecha_hora', ascending=False)
                     st.dataframe(df_pendientes[['fecha_hora', 'planta', 'monitor', 'sector', 'frecuencia']], use_container_width=True)
                     
                     st.write("---")
-                    st.write("**Revisar y Aprobar Inspección**")
+                    st.write("**Revisar y Firmar Registro**")
                     
                     opciones_revision = df_pendientes['id_registro'].tolist()
-                    nombres_revision = df_pendientes['fecha_hora'] + " | " + df_pendientes['planta'] + " | " + df_pendientes['sector'] + " (" + df_pendientes['monitor'] + ")"
+                    nombres_revision = df_pendientes['fecha_hora'] + " | " + df_pendientes['planta'] + " | " + df_pendientes['sector']
                     dict_revision = dict(zip(opciones_revision, nombres_revision))
                     
-                    registro_sel = st.selectbox("Seleccione el registro a revisar:", opciones_revision, format_func=lambda x: dict_revision[x], index=None, placeholder="--- Elija inspección ---")
+                    registro_sel = st.selectbox("Seleccione el registro a firmar:", opciones_revision, format_func=lambda x: dict_revision[x], index=None, placeholder="--- Elija inspección ---")
                     
                     if registro_sel:
                         df_det = pd.read_sql(f"SELECT equipo, evaluacion, accion_correctiva FROM limpieza_detalle WHERE id_registro = '{registro_sel}'", engine)
                         st.write("Detalle levantado por el monitor:")
                         
-                        # Colorear rojo automático si hay incumplimiento
                         def highlight_no_cumple(val):
-                            color = '#ff4b4b' if val == 'NO CUMPLE' else ''
-                            return f'background-color: {color}'
+                            return 'background-color: #ff4b4b' if val == 'NO CUMPLE' else ''
                             
                         st.dataframe(df_det.style.map(highlight_no_cumple, subset=['evaluacion']), use_container_width=True)
                         
-                        if st.button("Firma Digital: Aprobar Registro", type="primary"):
+                        if st.button(f"✍️ Firmar como: {nombre_firma}", type="primary"):
                             momento_aprobacion = pd.Timestamp.now(tz='America/Santiago').strftime("%Y-%m-%d %H:%M:%S")
                             with engine.begin() as conn:
-                                # Estampamos la firma en la BD
                                 query = text(f"""
                                     UPDATE limpieza_cabecera 
                                     SET estado_verificacion = 'Verificado', 
-                                        verificado_por = 'Jefe Calidad', 
+                                        verificado_por = '{nombre_firma}', 
                                         fecha_verificacion = '{momento_aprobacion}' 
                                     WHERE id_registro = '{registro_sel}'
                                 """)
                                 conn.execute(query)
-                            st.success("✅ Registro verificado y cerrado correctamente.")
+                            st.success("✅ Registro verificado y firmado correctamente.")
                             time.sleep(1.5)
                             st.rerun()
             except Exception as e:
