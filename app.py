@@ -22,7 +22,6 @@ if 'llave_reinicio' not in st.session_state:
 
 # --- 3. MENÚ LATERAL ---
 st.sidebar.title("Sistema de Gestión")
-# CAMBIO: Ahora se llama Formularios Operativos
 menu = st.sidebar.radio("Navegación:", ["📝 Formularios Operativos", "⚙️ Mantenedor de Personal"], key="menu_principal")
 
 # ==========================================
@@ -387,7 +386,6 @@ elif menu == "📝 Formularios Operativos":
             st.title("Check Limpieza y Sanitización (R.P-20.05)")
             st.subheader("Datos de la Inspección")
             
-            # MATRIZ DE FRECUENCIAS EXTRAÍDA DEL EXCEL ORIGINAL
             diccionario_limpieza = {
                 "Masas": {
                     "Diario": ["Mesones", "Cuchillos y Raspas", "Balanzas"],
@@ -443,7 +441,6 @@ elif menu == "📝 Formularios Operativos":
             with col1:
                 st.text_input("Fecha", ahora_chile.strftime("%d-%m-%Y"), disabled=True, key=f"f_limp_{st.session_state['llave_reinicio']}")
                 
-                # Manejo de Multi-Planta
                 es_multiplanta = st.session_state['planta_activa'].upper() == "AMBAS"
                 if es_multiplanta:
                     plantas_reales = df_personal[df_personal['Planta'].str.upper() != 'AMBAS']['Planta'].dropna().unique().tolist()
@@ -473,7 +470,7 @@ elif menu == "📝 Formularios Operativos":
                 lista_acciones_limpieza = [
                     "1- Volver a limpiar y sanitizar", 
                     "2- Capacitar al personal asignado", 
-                    "3- Revisión de procedimiento y/o metodología", 
+                    "3- Revisión de procedimiento/metodología", 
                     "4- Reforzar procedimiento eventual"
                 ]
                 
@@ -482,7 +479,10 @@ elif menu == "📝 Formularios Operativos":
                 
                 for i, equipo in enumerate(equipos_a_evaluar, 1):
                     st.markdown(f"**{i}. {equipo}**")
-                    resp = st.radio(f"Evaluación {equipo}", ["CUMPLE", "NO CUMPLE", "NO APLICA"], horizontal=True, key=f"eq_{equipo}_{st.session_state['llave_reinicio']}")
+                    
+                    # CAMBIO REALIZADO: Ahora es solo CUMPLE o NO CUMPLE. 
+                    # El sistema exige tomar responsabilidad por los equipos mostrados.
+                    resp = st.radio(f"Evaluación {equipo}", ["CUMPLE", "NO CUMPLE"], horizontal=True, key=f"eq_{equipo}_{st.session_state['llave_reinicio']}")
                     respuestas_limpieza[equipo] = resp
                     
                     if resp == "NO CUMPLE":
