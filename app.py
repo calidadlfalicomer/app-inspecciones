@@ -473,7 +473,7 @@ elif menu == "📝 Formularios Operativos":
                 lista_acciones_limpieza = [
                     "1- Volver a limpiar y sanitizar", 
                     "2- Capacitar al personal asignado", 
-                    "3- Revisión de procedimiento/metodología", 
+                    "3- Revisión de procedimiento y/o metodología", 
                     "4- Reforzar procedimiento eventual"
                 ]
                 
