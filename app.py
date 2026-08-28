@@ -133,6 +133,45 @@ if menu == "⚙️ Mantenedor de Personal":
 # ==========================================
 # PANTALLA 2: FORMULARIOS OPERATIVOS (CENTRAL DE REGISTROS)
 # ==========================================
+st.divider()
+
+        # --- OPCIÓN 3: INGRESO MANUAL ---
+        st.subheader("Opción 3: Agregar Personal Manualmente")
+        st.write("Agrega a un solo trabajador o monitor sin usar Excel.")
+        
+        with st.form("form_nuevo_personal"):
+            col_m1, col_m2 = st.columns(2)
+            with col_m1:
+                nuevo_nombre = st.text_input("Nombre y Apellido*")
+                nuevo_rol = st.selectbox("Rol*", ["Trabajador", "Monitor"])
+            with col_m2:
+                nueva_planta = st.selectbox("Planta*", ["La Florida", "Quilicura", "AMBAS"])
+                nuevo_pin = st.text_input("PIN numérico (Solo para Monitores)", type="password")
+            
+            submit_manual = st.form_submit_button("Guardar en Base de Datos")
+            
+            if submit_manual:
+                if nuevo_nombre.strip() == "":
+                    st.error("⚠️ El nombre es obligatorio.")
+                elif nuevo_rol == "Monitor" and nuevo_pin.strip() == "":
+                    st.error("⚠️ Si es Monitor, debe asignarle un PIN para que pueda iniciar sesión.")
+                else:
+                    nuevo_registro = pd.DataFrame([{
+                        'Planta': nueva_planta,
+                        'Rol': nuevo_rol,
+                        'Nombre': nuevo_nombre.strip().title(),
+                        'PIN': nuevo_pin.strip() if nuevo_rol == "Monitor" else None
+                    }])
+                    
+                    try:
+                        engine = create_engine(db_url)
+                        # Aquí usamos 'append' para AÑADIR a la lista, sin borrar lo anterior
+                        nuevo_registro.to_sql('maestro_personal', engine, if_exists='append', index=False)
+                        st.cache_data.clear()
+                        st.success(f"✅ {nuevo_nombre.title()} agregado correctamente como {nuevo_rol}.")
+                    except Exception as e:
+                        st.error(f"❌ Error al guardar: {e}")
+                        
 elif menu == "📝 Formularios Operativos":
 
     @st.cache_data(ttl=60) 
