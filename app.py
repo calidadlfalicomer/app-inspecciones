@@ -129,7 +129,7 @@ if menu == "⚙️ Mantenedor de Personal":
                             
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error en la traducción: {e}")
-                    
+
         st.divider()
 
         # --- OPCIÓN 3: INGRESO MANUAL ---
@@ -162,7 +162,6 @@ if menu == "⚙️ Mantenedor de Personal":
                     
                     try:
                         engine = create_engine(db_url)
-                        # Aquí usamos 'append' para AÑADIR a la lista, sin borrar lo anterior
                         nuevo_registro.to_sql('maestro_personal', engine, if_exists='append', index=False)
                         st.cache_data.clear()
                         st.success(f"✅ {nuevo_nombre.title()} agregado correctamente como {nuevo_rol}.")
@@ -192,31 +191,50 @@ elif menu == "📝 Formularios Operativos":
         if df_personal.empty or 'PIN' not in df_personal.columns or 'Planta' not in df_personal.columns:
             st.warning("⚠️ El sistema no está configurado aún. Vaya al Mantenedor y suba el Excel.")
         else:
-            monitores_db = df_personal[df_personal['Rol'] == 'Monitor']
-            lista_monitores = monitores_db['Nombre'].str.strip().drop_duplicates().sort_values().tolist()
+            # 1. Obtenemos las plantas (Excluyendo "AMBAS" para el menú desplegable inicial)
+            plantas_unicas = [p.title() for p in df_personal['Planta'].dropna().unique() if p.upper() != 'AMBAS']
+            plantas_unicas = list(set(plantas_unicas)) # Quitar duplicados por mayusculas/minusculas
             
-            usuario_intento = st.selectbox("Seleccione su usuario:", lista_monitores, index=None, placeholder="--- Elija su nombre ---")
-            pin_intento = st.text_input("Ingrese su PIN numérico:", type="password")
+            planta_login = st.selectbox("🏢 1. Seleccione la Planta donde se encuentra:", plantas_unicas, index=None, placeholder="--- Elija la planta ---")
             
-            if st.button("Ingresar", type="primary"):
-                if usuario_intento is None:
-                    st.error("Seleccione un usuario.")
-                else:
-                    fila_monitor = monitores_db[monitores_db['Nombre'] == usuario_intento].iloc[0]
-                    pin_real = fila_monitor['PIN']
-                    planta_real = fila_monitor['Planta']
-                    
-                    pin_real_str = str(pin_real).strip()
-                    if pin_real_str.endswith('.0'):
-                        pin_real_str = pin_real_str[:-2]
-                    
-                    if str(pin_intento).strip() == pin_real_str:
-                        st.session_state['autenticado'] = True
-                        st.session_state['monitor_activo'] = usuario_intento
-                        st.session_state['planta_activa'] = str(planta_real).strip()
-                        st.rerun()
+            if planta_login:
+                monitores_db = df_personal[df_personal['Rol'] == 'Monitor']
+                # 2. Filtramos la lista de monitores a los que pertenezcan a la planta elegida O sean de "AMBAS"
+                monitores_filtrados = monitores_db[
+                    (monitores_db['Planta'].str.upper() == planta_login.upper()) | 
+                    (monitores_db['Planta'].str.upper() == 'AMBAS')
+                ]
+                
+                lista_monitores = monitores_filtrados['Nombre'].str.strip().drop_duplicates().sort_values().tolist()
+                
+                usuario_intento = st.selectbox("👤 2. Seleccione su usuario:", lista_monitores, index=None, placeholder="--- Elija su nombre ---")
+                pin_intento = st.text_input("🔑 3. Ingrese su PIN numérico:", type="password")
+                
+                if st.button("Ingresar", type="primary"):
+                    if usuario_intento is None:
+                        st.error("Seleccione un usuario.")
                     else:
-                        st.error("❌ PIN incorrecto.")
+                        fila_monitor = monitores_filtrados[monitores_filtrados['Nombre'] == usuario_intento].iloc[0]
+                        pin_real = fila_monitor['PIN']
+                        planta_db = fila_monitor['Planta']
+                        
+                        pin_real_str = str(pin_real).strip()
+                        if pin_real_str.endswith('.0'):
+                            pin_real_str = pin_real_str[:-2]
+                        
+                        if str(pin_intento).strip() == pin_real_str:
+                            st.session_state['autenticado'] = True
+                            st.session_state['monitor_activo'] = usuario_intento
+                            
+                            # Si en base de datos es AMBAS, le fijamos la sesión a la planta donde está parado ahora
+                            if str(planta_db).strip().upper() == "AMBAS":
+                                st.session_state['planta_activa'] = planta_login
+                            else:
+                                st.session_state['planta_activa'] = str(planta_db).strip()
+                                
+                            st.rerun()
+                        else:
+                            st.error("❌ PIN incorrecto.")
 
     else:
         st.sidebar.divider()
