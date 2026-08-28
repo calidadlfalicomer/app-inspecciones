@@ -129,11 +129,8 @@ if menu == "⚙️ Mantenedor de Personal":
                             
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error en la traducción: {e}")
-
-# ==========================================
-# PANTALLA 2: FORMULARIOS OPERATIVOS (CENTRAL DE REGISTROS)
-# ==========================================
-st.divider()
+                    
+        st.divider()
 
         # --- OPCIÓN 3: INGRESO MANUAL ---
         st.subheader("Opción 3: Agregar Personal Manualmente")
@@ -171,7 +168,10 @@ st.divider()
                         st.success(f"✅ {nuevo_nombre.title()} agregado correctamente como {nuevo_rol}.")
                     except Exception as e:
                         st.error(f"❌ Error al guardar: {e}")
-                        
+
+# ==========================================
+# PANTALLA 2: FORMULARIOS OPERATIVOS (CENTRAL DE REGISTROS)
+# ==========================================
 elif menu == "📝 Formularios Operativos":
 
     @st.cache_data(ttl=60) 
