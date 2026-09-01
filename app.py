@@ -46,13 +46,18 @@ if menu == "⚙️ Mantenedor de Personal":
         if archivo_subido is not None:
             try:
                 df_personal = pd.read_excel(archivo_subido)
+                
+                # FORZAR MAYÚSCULAS EN EL EXCEL
+                if 'Nombre' in df_personal.columns:
+                    df_personal['Nombre'] = df_personal['Nombre'].astype(str).str.upper().str.strip()
+                    
                 st.dataframe(df_personal)
 
                 if st.button("Reemplazar Base de Datos"):
                     engine = create_engine(db_url)
                     df_personal.to_sql('maestro_personal', engine, if_exists='replace', index=False)
                     st.cache_data.clear()
-                    st.success("✅ ¡Base de datos reemplazada con éxito! Ahora es Multi-Planta.")
+                    st.success("✅ ¡Base de datos reemplazada con éxito! Ahora es Multi-Planta y en MAYÚSCULAS.")
             except Exception as e:
                 st.error(f"Error al procesar el archivo: {e}")
 
@@ -77,8 +82,8 @@ if menu == "⚙️ Mantenedor de Personal":
                             df_cab['id_registro'] = df_hist['nuevo_id_uuid']
                             df_cab['planta'] = df_hist['Planta']
                             df_cab['fecha_hora'] = pd.to_datetime(df_hist['Fecha_y_Hora']).astype(str)
-                            df_cab['monitor'] = df_hist['Monitor'].str.title()
-                            df_cab['trabajador_evaluado'] = df_hist['Trabajador_Evaluado'].str.title()
+                            df_cab['monitor'] = df_hist['Monitor'].astype(str).str.strip().str.upper() # Mayúsculas
+                            df_cab['trabajador_evaluado'] = df_hist['Trabajador_Evaluado'].astype(str).str.strip().str.upper() # Mayúsculas
                             df_cab['turno_final'] = df_hist['Turno_Final'].astype(str)
                             df_cab['area'] = df_hist['Area']
                             
@@ -156,7 +161,7 @@ if menu == "⚙️ Mantenedor de Personal":
                     nuevo_registro = pd.DataFrame([{
                         'Planta': nueva_planta,
                         'Rol': nuevo_rol,
-                        'Nombre': nuevo_nombre.strip().title(),
+                        'Nombre': nuevo_nombre.strip().upper(), # FORZAR MAYÚSCULAS AQUÍ
                         'PIN': nuevo_pin.strip() if nuevo_rol == "Monitor" else None
                     }])
                     
@@ -164,7 +169,7 @@ if menu == "⚙️ Mantenedor de Personal":
                         engine = create_engine(db_url)
                         nuevo_registro.to_sql('maestro_personal', engine, if_exists='append', index=False)
                         st.cache_data.clear()
-                        st.success(f"✅ {nuevo_nombre.title()} agregado correctamente como {nuevo_rol}.")
+                        st.success(f"✅ {nuevo_nombre.upper()} agregado correctamente como {nuevo_rol}.")
                     except Exception as e:
                         st.error(f"❌ Error al guardar: {e}")
 
@@ -191,15 +196,13 @@ elif menu == "📝 Formularios Operativos":
         if df_personal.empty or 'PIN' not in df_personal.columns or 'Planta' not in df_personal.columns:
             st.warning("⚠️ El sistema no está configurado aún. Vaya al Mantenedor y suba el Excel.")
         else:
-            # 1. Obtenemos las plantas (Excluyendo "AMBAS" para el menú desplegable inicial)
             plantas_unicas = [p.title() for p in df_personal['Planta'].dropna().unique() if p.upper() != 'AMBAS']
-            plantas_unicas = list(set(plantas_unicas)) # Quitar duplicados por mayusculas/minusculas
+            plantas_unicas = list(set(plantas_unicas))
             
             planta_login = st.selectbox("🏢 1. Seleccione la Planta donde se encuentra:", plantas_unicas, index=None, placeholder="--- Elija la planta ---")
             
             if planta_login:
                 monitores_db = df_personal[df_personal['Rol'] == 'Monitor']
-                # 2. Filtramos la lista de monitores a los que pertenezcan a la planta elegida O sean de "AMBAS"
                 monitores_filtrados = monitores_db[
                     (monitores_db['Planta'].str.upper() == planta_login.upper()) | 
                     (monitores_db['Planta'].str.upper() == 'AMBAS')
@@ -226,7 +229,6 @@ elif menu == "📝 Formularios Operativos":
                             st.session_state['autenticado'] = True
                             st.session_state['monitor_activo'] = usuario_intento
                             
-                            # Si en base de datos es AMBAS, le fijamos la sesión a la planta donde está parado ahora
                             if str(planta_db).strip().upper() == "AMBAS":
                                 st.session_state['planta_activa'] = planta_login
                             else:
@@ -300,7 +302,8 @@ elif menu == "📝 Formularios Operativos":
                     
                     if st.button("Guardar y Actualizar Lista", type="secondary"):
                         if nuevo_nombre_rapido.strip() != "" and nuevo_apellido_rapido.strip() != "":
-                            nombre_completo_rapido = f"{nuevo_nombre_rapido.strip()} {nuevo_apellido_rapido.strip()}".title()
+                            # FORZAR MAYÚSCULAS AQUÍ TAMBIÉN
+                            nombre_completo_rapido = f"{nuevo_nombre_rapido.strip()} {nuevo_apellido_rapido.strip()}".upper()
                             nuevo_registro = pd.DataFrame([{'Planta': str(planta_final).title(), 'Rol': 'Trabajador', 'Nombre': nombre_completo_rapido, 'PIN': None}])
                             
                             try:
