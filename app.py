@@ -82,8 +82,8 @@ if menu == "⚙️ Mantenedor de Personal":
                             df_cab['id_registro'] = df_hist['nuevo_id_uuid']
                             df_cab['planta'] = df_hist['Planta']
                             df_cab['fecha_hora'] = pd.to_datetime(df_hist['Fecha_y_Hora']).astype(str)
-                            df_cab['monitor'] = df_hist['Monitor'].astype(str).str.strip().str.upper() # Mayúsculas
-                            df_cab['trabajador_evaluado'] = df_hist['Trabajador_Evaluado'].astype(str).str.strip().str.upper() # Mayúsculas
+                            df_cab['monitor'] = df_hist['Monitor'].astype(str).str.strip().str.upper() 
+                            df_cab['trabajador_evaluado'] = df_hist['Trabajador_Evaluado'].astype(str).str.strip().str.upper() 
                             df_cab['turno_final'] = df_hist['Turno_Final'].astype(str)
                             df_cab['area'] = df_hist['Area']
                             
@@ -161,7 +161,7 @@ if menu == "⚙️ Mantenedor de Personal":
                     nuevo_registro = pd.DataFrame([{
                         'Planta': nueva_planta,
                         'Rol': nuevo_rol,
-                        'Nombre': nuevo_nombre.strip().upper(), # FORZAR MAYÚSCULAS AQUÍ
+                        'Nombre': nuevo_nombre.strip().upper(), 
                         'PIN': nuevo_pin.strip() if nuevo_rol == "Monitor" else None
                     }])
                     
@@ -172,7 +172,8 @@ if menu == "⚙️ Mantenedor de Personal":
                         st.success(f"✅ {nuevo_nombre.upper()} agregado correctamente como {nuevo_rol}.")
                     except Exception as e:
                         st.error(f"❌ Error al guardar: {e}")
-       st.divider()
+
+        st.divider()
 
         # --- OPCIÓN 4: ELIMINAR MONITORES ---
         st.subheader("Opción 4: Revocar Acceso a Monitores")
@@ -180,11 +181,9 @@ if menu == "⚙️ Mantenedor de Personal":
         
         try:
             engine = create_engine(db_url)
-            # Traemos SOLO LOS MONITORES directamente de la base de datos
             df_monitores = pd.read_sql("""SELECT * FROM maestro_personal WHERE "Rol" = 'Monitor' ORDER BY "Nombre" """, engine)
             
             if not df_monitores.empty:
-                # Creamos una lista amigable que muestre: NOMBRE (Planta)
                 opciones_eliminar = df_monitores['Nombre'] + " (" + df_monitores['Planta'] + ")"
                 dict_eliminar = dict(zip(opciones_eliminar, df_monitores['Nombre']))
                 
@@ -201,11 +200,10 @@ if menu == "⚙️ Mantenedor de Personal":
                     
                     if st.button("🗑️ Revocar Acceso", type="primary"):
                         with engine.begin() as conn:
-                            # Ejecutamos el comando SQL DELETE (con candado extra asegurando que sea Monitor)
                             query = text(f"""DELETE FROM maestro_personal WHERE "Nombre" = '{nombre_real_borrar}' AND "Rol" = 'Monitor'""")
                             conn.execute(query)
                             
-                        st.cache_data.clear() # Limpiamos la memoria
+                        st.cache_data.clear() 
                         st.success(f"✅ Acceso revocado correctamente para {nombre_real_borrar}.")
                         time.sleep(1.5)
                         st.rerun()
@@ -213,6 +211,7 @@ if menu == "⚙️ Mantenedor de Personal":
                 st.info("No hay monitores registrados en la base de datos en este momento.")
         except Exception as e:
             st.error(f"Error al cargar la lista de monitores: {e}")
+
 # ==========================================
 # PANTALLA 2: FORMULARIOS OPERATIVOS (CENTRAL DE REGISTROS)
 # ==========================================
@@ -342,7 +341,6 @@ elif menu == "📝 Formularios Operativos":
                     
                     if st.button("Guardar y Actualizar Lista", type="secondary"):
                         if nuevo_nombre_rapido.strip() != "" and nuevo_apellido_rapido.strip() != "":
-                            # FORZAR MAYÚSCULAS AQUÍ TAMBIÉN
                             nombre_completo_rapido = f"{nuevo_nombre_rapido.strip()} {nuevo_apellido_rapido.strip()}".upper()
                             nuevo_registro = pd.DataFrame([{'Planta': str(planta_final).title(), 'Rol': 'Trabajador', 'Nombre': nombre_completo_rapido, 'PIN': None}])
                             
