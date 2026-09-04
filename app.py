@@ -172,48 +172,47 @@ if menu == "⚙️ Mantenedor de Personal":
                         st.success(f"✅ {nuevo_nombre.upper()} agregado correctamente como {nuevo_rol}.")
                     except Exception as e:
                         st.error(f"❌ Error al guardar: {e}")
-        st.divider()
+       st.divider()
 
-        # --- OPCIÓN 4: ELIMINAR PERSONAL ---
-        st.subheader("Opción 4: Eliminar Personal")
-        st.write("Selecciona un trabajador o monitor para darlo de baja del sistema.")
+        # --- OPCIÓN 4: ELIMINAR MONITORES ---
+        st.subheader("Opción 4: Revocar Acceso a Monitores")
+        st.write("Selecciona un monitor para darlo de baja y quitarle el acceso al sistema.")
         
         try:
             engine = create_engine(db_url)
-            # Traemos la lista actual directamente de la base de datos
-            df_lista = pd.read_sql('SELECT * FROM maestro_personal ORDER BY "Nombre"', engine)
+            # Traemos SOLO LOS MONITORES directamente de la base de datos
+            df_monitores = pd.read_sql("""SELECT * FROM maestro_personal WHERE "Rol" = 'Monitor' ORDER BY "Nombre" """, engine)
             
-            if not df_lista.empty:
-                # Creamos una lista amigable que muestre: NOMBRE (Rol - Planta)
-                opciones_eliminar = df_lista['Nombre'] + " (" + df_lista['Rol'] + " - " + df_lista['Planta'] + ")"
-                dict_eliminar = dict(zip(opciones_eliminar, df_lista['Nombre']))
+            if not df_monitores.empty:
+                # Creamos una lista amigable que muestre: NOMBRE (Planta)
+                opciones_eliminar = df_monitores['Nombre'] + " (" + df_monitores['Planta'] + ")"
+                dict_eliminar = dict(zip(opciones_eliminar, df_monitores['Nombre']))
                 
                 usuario_a_eliminar = st.selectbox(
-                    "Seleccione la persona a dar de baja:", 
+                    "Seleccione el monitor a dar de baja:", 
                     opciones_eliminar.tolist(), 
                     index=None, 
-                    placeholder="--- Busque y elija un usuario ---"
+                    placeholder="--- Busque y elija un monitor ---"
                 )
                 
                 if usuario_a_eliminar:
                     nombre_real_borrar = dict_eliminar[usuario_a_eliminar]
-                    st.warning(f"⚠️ ¿Estás seguro de eliminar a **{nombre_real_borrar}**? Ya no podrá iniciar sesión ni aparecerá en las listas.")
+                    st.warning(f"⚠️ ¿Estás seguro de eliminar al monitor **{nombre_real_borrar}**? Perderá inmediatamente su acceso para ingresar formularios.")
                     
-                    if st.button("🗑️ Confirmar Eliminación", type="primary"):
+                    if st.button("🗑️ Revocar Acceso", type="primary"):
                         with engine.begin() as conn:
-                            # Ejecutamos el comando SQL DELETE
-                            query = text(f"""DELETE FROM maestro_personal WHERE "Nombre" = '{nombre_real_borrar}'""")
+                            # Ejecutamos el comando SQL DELETE (con candado extra asegurando que sea Monitor)
+                            query = text(f"""DELETE FROM maestro_personal WHERE "Nombre" = '{nombre_real_borrar}' AND "Rol" = 'Monitor'""")
                             conn.execute(query)
                             
-                        st.cache_data.clear() # Limpiamos la memoria para que los desplegables se actualicen
-                        st.success(f"✅ {nombre_real_borrar} ha sido eliminado correctamente.")
+                        st.cache_data.clear() # Limpiamos la memoria
+                        st.success(f"✅ Acceso revocado correctamente para {nombre_real_borrar}.")
                         time.sleep(1.5)
                         st.rerun()
             else:
-                st.info("No hay personal registrado en la base de datos en este momento.")
+                st.info("No hay monitores registrados en la base de datos en este momento.")
         except Exception as e:
-            st.error(f"Error al cargar la lista de personal: {e}")
-
+            st.error(f"Error al cargar la lista de monitores: {e}")
 # ==========================================
 # PANTALLA 2: FORMULARIOS OPERATIVOS (CENTRAL DE REGISTROS)
 # ==========================================
