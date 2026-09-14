@@ -363,7 +363,7 @@ elif menu == "📝 Formularios Operativos":
             with col_t2:
                 turno_numero = st.radio("Turno Numero*", ["1", "2", "3"], horizontal=True, label_visibility="collapsed")
 
-            area = st.radio("Área*", ["Bodega MMPP", "Masas", "Corte", "Horno", "Envasado", "Aseo", "Jefatura"], horizontal=True)
+            area = st.radio("Área*", ["Bodega MMPP", "Masas", "Corte", "Horno", "Envasado", "Aseo", "Dosis", "Jefatura"], horizontal=True)
 
             st.divider()
             st.subheader("Evaluación de Parámetros")
