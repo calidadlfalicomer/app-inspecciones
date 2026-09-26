@@ -6,7 +6,7 @@ import uuid
 import time
 
 # --- 1. CONEXIÓN A LA BASE DE DATOS ---
-db_url = "postgresql://postgres.gejkgyqrnmetjdguekvt:Alicomer2027%23@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
+db_url = "postgresql+psycopg2://postgres.gejkgyqrnmetjdguekvt:Alicomer2027%23@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
 
 # --- 2. MEMORIA DE SESIÓN ---
 if 'autenticado' not in st.session_state:
