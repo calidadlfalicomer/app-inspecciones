@@ -222,6 +222,20 @@ elif menu == "📝 Formularios Operativos":
         try:
             engine = create_engine(db_url)
             df = pd.read_sql("SELECT * FROM maestro_personal", engine)
+            
+            # --- SOLUCIÓN DEL BUG: LIMPIEZA DE COLUMNAS ---
+            mapeo_columnas = {}
+            for col in df.columns:
+                col_limpia = str(col).strip().lower()
+                if col_limpia == 'planta': mapeo_columnas[col] = 'Planta'
+                elif col_limpia == 'rol': mapeo_columnas[col] = 'Rol'
+                elif col_limpia == 'nombre': mapeo_columnas[col] = 'Nombre'
+                elif col_limpia == 'pin': mapeo_columnas[col] = 'PIN'
+                else: mapeo_columnas[col] = str(col).strip()
+            
+            df = df.rename(columns=mapeo_columnas)
+            # ----------------------------------------------
+            
             return df
         except Exception as e:
             return pd.DataFrame() 
