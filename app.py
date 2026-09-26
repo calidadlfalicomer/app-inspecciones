@@ -217,13 +217,12 @@ if menu == "⚙️ Mantenedor de Personal":
 # ==========================================
 elif menu == "📝 Formularios Operativos":
 
-    @st.cache_data(ttl=60) 
+    # --- FUNCIÓN MODIFICADA: SIN CACHÉ Y CON EL ERROR EXPUESTO ---
     def cargar_nombres_oficiales():
         try:
             engine = create_engine(db_url)
             df = pd.read_sql("SELECT * FROM maestro_personal", engine)
             
-            # --- SOLUCIÓN DEL BUG: LIMPIEZA DE COLUMNAS ---
             mapeo_columnas = {}
             for col in df.columns:
                 col_limpia = str(col).strip().lower()
@@ -234,10 +233,10 @@ elif menu == "📝 Formularios Operativos":
                 else: mapeo_columnas[col] = str(col).strip()
             
             df = df.rename(columns=mapeo_columnas)
-            # ----------------------------------------------
-            
             return df
         except Exception as e:
+            # ESTO MOSTRARÁ EL ERROR REAL EN PANTALLA
+            st.error(f"🚨 ERROR OCULTO DESCUBIERTO: {e}")
             return pd.DataFrame() 
 
     df_personal = cargar_nombres_oficiales()
