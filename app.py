@@ -4,9 +4,9 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 import uuid
 import time
+import re
 
 # --- 1. CONEXIÓN A LA BASE DE DATOS ---
-# Incluye +psycopg2 para que Streamlit sepa qué driver usar
 db_url = "postgresql+psycopg2://postgres.gejkgyqrnmetjdguekvt:Alicomer2027%23@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
 
 # --- 2. MEMORIA DE SESIÓN ---
@@ -90,19 +90,27 @@ if menu == "⚙️ Mantenedor de Personal":
                             # FORZAR ÁREAS A MAYÚSCULAS AUTOMÁTICAMENTE
                             df_cab['area'] = df_hist['Area'].astype(str).str.strip().str.upper()
                             
-                            mapa_preguntas = {
-                                "1_Manos_Limpias": "1_Manos_Limpias",
-                                "2_Pelo_Tomado_y_Cofia": "2_Pelo_Tomado_y_Cofia",
-                                "3_Uñas_Cortas_y_Sin_Esmalte": "3_Uñas_Cortas_y_Sin_Esmalte",
-                                "4_Sin_Heridas_Ni_Cortes": "4_Sin_Heridas_Ni_Cortes",
-                                "5_Uniforme_Limpio_y_Buen_Estado": "5_Uniforme_Limpio_y_Buen_Estado",
-                                "6_Lentes_Opticos_Buen_Estado": "6_Lentes_Opticos_Buen_Estado",
-                                "7_Sin_Maquillaje_Barba_Pestañas": "7_Sin_Maquillaje_Barba_Pestañas",
-                                "8_Celular, Parlante y/o Audifonos": "8_Celular_Parlante_y/o_Audifonos",
-                                "9_Joyas y Accesorios": "9_Joyas_y_Accesorios",
-                                "10_Buen_Estado_Salud": "10_Buen_Estado_Salud",
-                                "11_Consumo de Alimentos y bebidas": "11_Consumo_de_Alimentos_y_bebidas"
+                            # --- NUEVO: TRADUCTOR INTELIGENTE DE COLUMNAS ---
+                            # Sin importar cómo venga escrito del Excel, extraeremos el número del 1 al 11 
+                            # y lo conectaremos con la columna perfecta de la base de datos.
+                            nombres_db = {
+                                "1": "1_Manos_Limpias", "2": "2_Pelo_Tomado_y_Cofia", 
+                                "3": "3_Uñas_Cortas_y_Sin_Esmalte", "4": "4_Sin_Heridas_Ni_Cortes", 
+                                "5": "5_Uniforme_Limpio_y_Buen_Estado", "6": "6_Lentes_Opticos_Buen_Estado", 
+                                "7": "7_Sin_Maquillaje_Barba_Pestañas", "8": "8_Celular_Parlante_y/o_Audifonos", 
+                                "9": "9_Joyas_y_Accesorios", "10": "10_Buen_Estado_Salud", 
+                                "11": "11_Consumo_de_Alimentos_y_bebidas"
                             }
+                            
+                            mapa_preguntas_inteligente = {}
+                            for col in df_hist.columns:
+                                # Buscar si la columna empieza con uno o dos números (ej: "1.", "1_", "10 ")
+                                match = re.match(r'^(\d+)', str(col).strip())
+                                if match:
+                                    numero_pregunta = match.group(1)
+                                    if numero_pregunta in nombres_db:
+                                        mapa_preguntas_inteligente[col] = nombres_db[numero_pregunta]
+                            # ------------------------------------------------
                             
                             detalles = []
                             for idx, row in df_hist.iterrows():
@@ -111,11 +119,10 @@ if menu == "⚙️ Mantenedor de Personal":
                                 if accion_gen.strip().lower() in ['nan', 'none', '']: 
                                     accion_gen = 'Ninguna'
                                 
-                                for col_excel, param_db in mapa_preguntas.items():
+                                for col_excel, param_db in mapa_preguntas_inteligente.items():
                                     if col_excel in row:
                                         evaluacion = str(row[col_excel]).strip().upper()
                                         
-                                        # Indentación corregida a 4 espacios exactos
                                         if evaluacion not in ['CUMPLE', 'NO CUMPLE', 'NO APLICA']:
                                             evaluacion = 'CUMPLE' 
                                             
@@ -228,7 +235,6 @@ elif menu == "📝 Formularios Operativos":
             engine = create_engine(db_url)
             df = pd.read_sql("SELECT * FROM maestro_personal", engine)
             
-            # Limpieza de columnas rebeldes
             mapeo_columnas = {}
             for col in df.columns:
                 col_limpia = str(col).strip().lower()
