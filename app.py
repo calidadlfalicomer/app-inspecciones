@@ -519,4 +519,87 @@ elif menu == "📝 Formularios Operativos":
 elif menu == "✅ Verificación Jefatura":
     st.title("✅ Panel de Jefatura (R.P-20.05)")
     col_perfil, col_pass = st.columns(2)
-    with col
+    with col_perfil:
+        perfil_seleccionado = st.selectbox("👤 Seleccione su Perfil:", ["--- Seleccione ---", "Lissette Dinamarca (La Florida)", "Lilian Rojas (Quilicura)", "Claudia Llaña (Corporativo)"])
+    with col_pass:
+        admin_pass = st.text_input("Ingrese su contraseña:", type="password", key="pass_jefatura")
+    
+    if perfil_seleccionado != "--- Seleccione ---" and admin_pass == "Calidad2026":
+        if "Lissette" in perfil_seleccionado:
+            planta_permitida, nombre_firma = "La Florida", "Lissette Dinamarca"
+        elif "Lilian" in perfil_seleccionado:
+            planta_permitida, nombre_firma = "Quilicura", "Lilian Rojas"
+        else:
+            planta_permitida, nombre_firma = "TODAS", "Claudia Llaña"
+
+        st.success(f"Bienvenida, {nombre_firma}. Viendo datos de: {planta_permitida}")
+        st.divider()
+        tab1, tab2 = st.tabs(["🚨 Alertas de Frecuencia", "✍️ Registros Pendientes por Firmar"])
+        
+        with tab1:
+            st.subheader("Estado actual de limpieza por sector")
+            try:
+                engine = create_engine(db_url)
+                query_alertas = "SELECT planta, sector, frecuencia, fecha_hora FROM limpieza_cabecera"
+                if planta_permitida != "TODAS": query_alertas += f" WHERE planta = '{planta_permitida}'"
+                df_cab = pd.read_sql(query_alertas, engine)
+                if df_cab.empty:
+                    st.info(f"Aún no hay registros de limpieza para {planta_permitida}.")
+                else:
+                    df_cab['fecha_hora_dt'] = pd.to_datetime(df_cab['fecha_hora'])
+                    ultima_limpieza = df_cab.groupby(['planta', 'sector', 'frecuencia'])['fecha_hora_dt'].max().reset_index()
+                    ahora = pd.Timestamp.now(tz='America/Santiago').tz_localize(None)
+                    ultima_limpieza['dias_transcurridos'] = (ahora - ultima_limpieza['fecha_hora_dt']).dt.days
+                    limites = {"Diario": 1, "Semanal": 7, "Quincenal": 15, "Mensual": 30, "Semestral": 180}
+                    def estado_alerta(row):
+                        limite = limites.get(row['frecuencia'], 999)
+                        dias = row['dias_transcurridos']
+                        if dias > limite: return "🔴 Atrasado"
+                        elif dias == limite or dias == (limite - 1): return "🟡 Por vencer"
+                        else: return "🟢 Al día"
+                    ultima_limpieza['Estado'] = ultima_limpieza.apply(estado_alerta, axis=1)
+                    ultima_limpieza['Última Limpieza'] = ultima_limpieza['fecha_hora_dt'].dt.strftime('%Y-%m-%d %H:%M')
+                    st.dataframe(ultima_limpieza[['planta', 'sector', 'frecuencia', 'Última Limpieza', 'dias_transcurridos', 'Estado']].sort_values(['Estado', 'dias_transcurridos'], ascending=[True, False]), use_container_width=True)
+            except Exception as e:
+                st.error(f"Error cargando alertas: {e}")
+                
+        with tab2:
+            st.subheader(f"Bandeja de Entrada: {planta_permitida}")
+            try:
+                engine = create_engine(db_url)
+                query_pendientes = "SELECT * FROM limpieza_cabecera WHERE (estado_verificacion = 'Pendiente' OR estado_verificacion IS NULL)"
+                if planta_permitida != "TODAS": query_pendientes += f" AND planta = '{planta_permitida}'"
+                df_pendientes = pd.read_sql(query_pendientes, engine)
+                if df_pendientes.empty:
+                    st.success("🎉 ¡Todo al día! No hay registros pendientes de verificación en su bandeja.")
+                else:
+                    df_pendientes = df_pendientes.sort_values('fecha_hora', ascending=False)
+                    st.dataframe(df_pendientes[['fecha_hora', 'planta', 'monitor', 'sector', 'frecuencia']], use_container_width=True)
+                    st.write("---")
+                    st.write("**Revisar y Firmar Registro**")
+                    opciones_revision = df_pendientes['id_registro'].tolist()
+                    nombres_revision = df_pendientes['fecha_hora'] + " | " + df_pendientes['planta'] + " | " + df_pendientes['sector']
+                    dict_revision = dict(zip(opciones_revision, nombres_revision))
+                    registro_sel = st.selectbox("Seleccione el registro a firmar:", opciones_revision, format_func=lambda x: dict_revision[x], index=None, placeholder="--- Elija inspección ---")
+                    
+                    if registro_sel:
+                        df_det = pd.read_sql(f"SELECT equipo, evaluacion, accion_correctiva FROM limpieza_detalle WHERE id_registro = '{registro_sel}'", engine)
+                        st.write("Detalle levantado por el monitor:")
+                        def highlight_no_cumple(val): return 'background-color: #ff4b4b' if val == 'NO CUMPLE' else ''
+                        st.dataframe(df_det.style.map(highlight_no_cumple, subset=['evaluacion']), use_container_width=True)
+                        if st.button(f"✍️ Firmar como: {nombre_firma}", type="primary"):
+                            momento_aprobacion = pd.Timestamp.now(tz='America/Santiago').strftime("%Y-%m-%d %H:%M:%S")
+                            with engine.begin() as conn:
+                                query = text(f"""
+                                    UPDATE limpieza_cabecera 
+                                    SET estado_verificacion = 'Verificado', 
+                                        verificado_por = '{nombre_firma}', 
+                                        fecha_verificacion = '{momento_aprobacion}' 
+                                    WHERE id_registro = '{registro_sel}'
+                                """)
+                                conn.execute(query)
+                            st.success("✅ Registro verificado y firmado correctamente.")
+                            time.sleep(1.5)
+                            st.rerun()
+            except Exception as e:
+                st.error(f"Error cargando registros pendientes: {e}")
